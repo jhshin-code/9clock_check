@@ -8,16 +8,14 @@
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; background-color: #f0f2f5; padding: 20px; text-align: center; }
         
-        /* 메인 컨테이너 (처음엔 숨김 처리 될 수도 있음) */
         .container { max-width: 500px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        
-        /* PC 로그인 화면 스타일 */
-        #pc-login-screen { 
-            display: none; /* 기본 숨김 */
-            max-width: 400px; margin: 50px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); 
-        }
+        #pc-login-screen { display: none; max-width: 400px; margin: 50px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
 
-        h2 { margin-bottom: 20px; color: #333; }
+        h2 { margin-bottom: 10px; color: #333; }
+        
+        /* 시계 스타일 추가 */
+        #live-clock { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 5px; letter-spacing: 1px; }
+        
         select, input { width: 100%; padding: 12px; margin: 8px 0; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box;}
         #excuse-select { border-color: #6c757d; color: #333; }
         
@@ -30,11 +28,15 @@
         #login-btn { background-color: #28a745; margin-top: 10px; width: 100%; }
         
         button:disabled { background-color: #ccc; cursor: not-allowed; opacity: 0.7; }
-        .status-msg { margin: 15px 0; font-size: 14px; font-weight: bold; }
-        .gps-status { font-size: 12px; color: #666; margin-bottom: 15px; }
-        .ok { color: #28a745; }
-        .no { color: #dc3545; }
         
+        .status-msg { margin: 10px 0 20px 0; font-size: 15px; font-weight: bold; padding: 10px; border-radius: 8px; }
+        .gps-status { font-size: 12px; color: #666; margin-bottom: 15px; }
+        
+        .ok-msg { background-color: #d4edda; color: #155724; }
+        .no-msg { background-color: #f8d7da; color: #721c24; }
+        .gps-ok { color: #28a745; font-weight: bold; }
+        .gps-no { color: #dc3545; font-weight: bold; }
+
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: white; margin: 10% auto; padding: 20px; width: 90%; max-width: 400px; border-radius: 10px; position: relative; }
         .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #aaa; }
@@ -45,14 +47,16 @@
 <div id="pc-login-screen">
     <h2>💻 PC 접속 제한</h2>
     <p style="color:#666; font-size:14px; margin-bottom:20px;">PC로 접속하셨습니다.<br>관리자 접속 코드를 입력해주세요.</p>
-    <input type="password" id="pc-access-code" placeholder="접속 코드 입력 (예: 1234)">
+    <input type="password" id="pc-access-code" placeholder="접속 코드 입력">
     <button id="login-btn" onclick="checkPcLogin()">접속하기</button>
 </div>
 
 <div id="main-app" class="container" style="display:none;">
-    <h2>📍 위치기반 출석부</h2>
+    <h2>📍 주일 말씀 출석부</h2>
+    
+    <div id="live-clock">00:00:00</div>
+    <div id="time-msg" class="status-msg no-msg">시간 확인 중...</div>
     <div id="gps-msg" class="gps-status">위치 확인 중...</div>
-    <div id="time-msg" class="status-msg"></div>
 
     <select id="dept-select" onchange="loadNames()"><option value="">부서 선택</option></select>
     <select id="name-select" disabled><option value="">이름 선택</option></select>
@@ -88,57 +92,116 @@
 
 <script>
     // ================= [설정 영역] =================
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbw1sKmeXDgdGRtl1vReccQYaJG6Jb_suB4QYL_vRyxnOQOGvbAH-OuopFwQo-Xyj66X/exec"; // *** 배포된 URL 입력 ***
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyatG4cNihLgNZdaQ4PMXjnG9he194qWFETWN6LRN-VfaNbeLwxFmkp8nE8D9urz-M/exec"; // *** 배포된 URL 입력 ***
     const TARGET_LAT = 37.5665; 
     const TARGET_LON = 126.9780; 
     const ALLOWED_RADIUS = 300; 
-    
-    // [PC 접속 비밀번호 설정]
     const PC_ACCESS_PASSWORD = "1234"; 
     // ===============================================
 
     let membersData = [];
     let isLocationValid = false; 
+    let isTimeValid = false; // 시간 유효성 체크용
     let myChart = null;
 
-    // 접속 시 실행
     window.onload = function() {
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         if (isMobile) {
-            // 모바일이면 바로 앱 실행
             initApp();
         } else {
-            // PC면 로그인 화면 띄우기
             document.getElementById('pc-login-screen').style.display = 'block';
-            
-            // 엔터키 입력 지원
             document.getElementById("pc-access-code").addEventListener("keyup", function(event) {
                 if (event.key === "Enter") checkPcLogin();
             });
         }
     };
 
-    // PC 로그인 체크 함수
     function checkPcLogin() {
-        const inputCode = document.getElementById('pc-access-code').value;
-        if (inputCode === PC_ACCESS_PASSWORD) {
-            alert("접속되었습니다.");
+        if (document.getElementById('pc-access-code').value === PC_ACCESS_PASSWORD) {
             document.getElementById('pc-login-screen').style.display = 'none';
-            initApp(); // 앱 시작
+            initApp();
         } else {
             alert("비밀번호가 틀렸습니다.");
-            document.getElementById('pc-access-code').value = "";
-            document.getElementById('pc-access-code').focus();
         }
     }
 
-    // 앱 초기화 및 시작
     function initApp() {
-        document.getElementById('main-app').style.display = 'block'; // 메인 화면 표시
+        document.getElementById('main-app').style.display = 'block';
         fetchMembers();
-        checkTimeAndLocation();
+        
+        // 1초마다 시계와 상태를 업데이트 (핵심 기능)
+        setInterval(updateClockAndStatus, 1000);
+        updateClockAndStatus(); // 즉시 실행
+        
+        // GPS는 1회 + 변화 감지
+        checkLocation();
     }
+
+    // [핵심] 실시간 시계 및 시간 제한 로직
+    function updateClockAndStatus() {
+        const now = new Date();
+        const days = ['일', '월', '화', '수', '목', '금', '토'];
+        const day = now.getDay(); 
+        
+        // 시계 표시 (예: 09:05:12)
+        const timeString = now.toLocaleTimeString('ko-KR', { hour12: false });
+        document.getElementById('live-clock').innerText = timeString;
+
+        // 시간 제한 로직 (주일 08:30 ~ 09:59:59 까지) -> 10:00 되면 닫힘
+        // 테스트가 필요하면 아래 'isSunday' 조건을 주석처리 하세요.
+        const isSunday = (day === 0); 
+        const currentMin = now.getHours() * 60 + now.getMinutes();
+        const startMin = 8 * 60 + 0; // 08:30
+        const endMin = 10 * 60 + 0;   // 10:00
+
+        const msgBox = document.getElementById('time-msg');
+
+        // 조건: 주일이고, 지정된 시간 범위 내인가?
+        if (isSunday && currentMin >= startMin && currentMin < endMin) {
+            isTimeValid = true;
+            msgBox.innerHTML = "✅ 출석 체크 가능 시간입니다";
+            msgBox.className = "status-msg ok-msg";
+        } else {
+            isTimeValid = false;
+            // 왜 안되는지 메시지 표시
+            if (!isSunday) {
+                msgBox.innerHTML = "⛔ 오늘은 주일이 아닙니다";
+            } else if (currentMin < startMin) {
+                msgBox.innerHTML = "⛔ 08:00 부터 체크 가능합니다";
+            } else {
+                msgBox.innerHTML = "⛔ 출석 마감 (10:00 종료)";
+            }
+            msgBox.className = "status-msg no-msg";
+        }
+        
+        checkButtons(); // 버튼 상태 갱신
+    }
+
+    function checkLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition((position) => {
+                const dist = getDistanceFromLatLonInMeters(position.coords.latitude, position.coords.longitude, TARGET_LAT, TARGET_LON);
+                const gpsMsg = document.getElementById('gps-msg');
+                if (dist <= ALLOWED_RADIUS) {
+                    isLocationValid = true;
+                    gpsMsg.innerHTML = `<span class="gps-ok">📍 위치 인증 완료 (${Math.round(dist)}m)</span>`;
+                } else {
+                    isLocationValid = false;
+                    gpsMsg.innerHTML = `<span class="gps-no">❌ 교회와 멉니다 (${Math.round(dist)}m)</span>`;
+                }
+                checkButtons();
+            }, () => { isLocationValid = false; }, { enableHighAccuracy: true });
+        }
+    }
+
+    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371; 
+        const dLat = deg2rad(lat2 - lat1); const dLon = deg2rad(lon2 - lon1);
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1000;
+    }
+    function deg2rad(deg) { return deg * (Math.PI/180); }
 
     function fetchMembers() {
         fetch(GAS_URL + "?action=getMembers")
@@ -168,36 +231,15 @@
         checkButtons();
     }
 
-    function checkTimeAndLocation() {
-        document.getElementById('time-msg').innerHTML = "<span class='ok'>✅ 시간 확인됨</span>";
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                const dist = getDistanceFromLatLonInMeters(position.coords.latitude, position.coords.longitude, TARGET_LAT, TARGET_LON);
-                const gpsMsg = document.getElementById('gps-msg');
-                if (dist <= ALLOWED_RADIUS) {
-                    isLocationValid = true;
-                    gpsMsg.innerHTML = `<span class="ok">📍 위치 인증 완료 (${Math.round(dist)}m)</span>`;
-                } else {
-                    isLocationValid = false;
-                    gpsMsg.innerHTML = `<span class="no">❌ 위치 불일치 (${Math.round(dist)}m)</span>`;
-                }
-                checkButtons();
-            }, () => { isLocationValid = false; checkButtons(); }, { enableHighAccuracy: true });
-        }
-    }
-
-    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-        const R = 6371; 
-        const dLat = deg2rad(lat2 - lat1); const dLon = deg2rad(lon2 - lon1);
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1000;
-    }
-    function deg2rad(deg) { return deg * (Math.PI/180); }
-
+    // 버튼 활성화 규칙 수정
     function checkButtons() {
         const nameSelected = document.getElementById('name-select').value !== "";
+        
+        // 출석 버튼: [이름선택 O] AND [위치 O] AND [시간 O]
+        document.getElementById('attend-btn').disabled = !(nameSelected && isLocationValid && isTimeValid);
+        
+        // 사유 제출: [이름선택 O] 이면 가능 (시간/위치 상관없이)
         document.getElementById('excuse-btn').disabled = !nameSelected;
-        document.getElementById('attend-btn').disabled = !(nameSelected && isLocationValid);
     }
 
     function handleAttendance(type) {
@@ -207,6 +249,8 @@
         let note = "정상출석";
 
         if (type === 'attend') {
+            // 시간 한번 더 체크 (해킹 방지)
+            if(!isTimeValid) { alert("지금은 출석 체크 시간이 아닙니다."); return; }
             if (!confirm(`[${name}]님 현재 위치에서 출석 체크하시겠습니까?`)) return;
         } else if (type === 'excuse') {
             if (excuseSelect.value === "") { alert("사유를 선택해주세요."); return; }
@@ -214,13 +258,15 @@
             note = excuseSelect.value;
         }
 
+        // 버튼 잠금
         document.getElementById('attend-btn').disabled = true;
         document.getElementById('excuse-btn').disabled = true;
+
         fetch(GAS_URL, { method: "POST", body: JSON.stringify({ dept, name, note }) })
         .then(res => res.json()).then(() => { alert("처리되었습니다."); location.reload(); });
     }
 
-    // ============ [통계 및 그래프] ============
+    // 통계 기능
     function openStats() { document.getElementById('statsModal').style.display = "block"; drawStats(); }
     function closeStats() { document.getElementById('statsModal').style.display = "none"; }
     window.onclick = function(event) { if (event.target == document.getElementById('statsModal')) closeStats(); }
@@ -253,17 +299,7 @@
                 options: {
                     responsive: true,
                     scales: { y: { beginAtZero: true, max: 100, ticks: { callback: function(v){return v+"%"} } } },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const d = stats[context.dataIndex];
-                                    return `${d.rate}% (${d.earned}점 / ${d.max}점) - 재적 ${d.count}명`;
-                                }
-                            }
-                        }
-                    }
+                    plugins: { legend: { display: false } }
                 }
             });
 
