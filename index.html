@@ -324,7 +324,7 @@
         .then(() => { 
             if(type === 'attend') fireConfetti(); 
             setTimeout(() => {
-                alert(`🎉 [${name}]님 처리 완료!`);
+                alert(`🎉 [${name}]님 출석 체크 완료!`);
                 localStorage.setItem("last_submit_time", new Date().getTime());
                 location.reload(); 
             }, 1000);
