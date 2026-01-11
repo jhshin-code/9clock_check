@@ -55,9 +55,12 @@
         .log-table th { background-color: #f8f9fa; padding: 8px; border-bottom: 2px solid #ddd; color: #555; }
         .log-table td { padding: 8px; border-bottom: 1px solid #eee; color: #333; }
         .log-table tr:last-child td { border-bottom: none; }
+        
+        /* 배지 스타일 */
         .badge { padding: 3px 6px; border-radius: 4px; font-size: 11px; color: white; }
-        .bg-ok { background-color: #28a745; }
-        .bg-no { background-color: #ffc107; color: #333; }
+        .bg-ok { background-color: #28a745; }   /* 정상: 초록 */
+        .bg-warn { background-color: #ff9800; } /* 지각: 주황 */
+        .bg-no { background-color: #ffc107; color: #333; } /* 기타: 노랑 */
         
         /* PC 로그인 */
         #pc-login-screen { display: none; max-width: 400px; margin: 50px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
@@ -130,8 +133,8 @@
 
         <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
 
-        <h3>🏆 개인 출석 순위 </h3>
-        <div id="rank-list" style="text-align: left; background: #f9f9f9; padding: 15px; border-radius: 8px; font-size: 14px;">
+        <h3>🏆 개인 출석 순위 (평균) </h3>
+        <div id="rank-list" style="text-align: left; background: #f9f9f9; padding: 15px; border-radius: 8px; font-size: 14px; max-height: 250px; overflow-y: auto;">
             로딩 중...
         </div>
     </div>
@@ -139,8 +142,10 @@
 
 <script>
     // ================= [설정 영역] =================
-    // ★ 주의: 반드시 새로 배포한 URL로 교체하세요!
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwCxvxklH7x26H9aACZchjc9YxeUCUaDuP54NjA9mHLj69I6zjip5wgeqncEX5j5nyV/exec"; 
+    // ★ 주의: 아래 URL을 새로 배포한 웹앱 URL로 꼭 변경해주세요!
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyslE7DQShjZS6bGQmPEPcFPOmLl2lcFJknhz0oZwEXAHGG-Af8tSa9fqhsJS1gp0aU/exec"; 
+    
+    // 교회 좌표 및 설정
     const TARGET_LAT = 37.192984; 
     const TARGET_LON = 127.059825; 
     const ALLOWED_RADIUS = 300; 
@@ -406,7 +411,14 @@
                 html = "<tr><td colspan='4'>아직 출석한 사람이 없습니다.</td></tr>";
             } else {
                 data.todayList.forEach(log => {
-                    const badgeClass = log.note === "정상출석" || !log.note ? "bg-ok" : "bg-no";
+                    // ★ 지각 여부에 따른 배지 색상 처리
+                    let badgeClass = "bg-ok"; 
+                    if (log.note === "지각") {
+                        badgeClass = "bg-warn"; // 주황색
+                    } else if (log.note !== "정상출석" && log.note !== "정상") {
+                        badgeClass = "bg-no"; // 노란색
+                    }
+
                     const noteText = log.note || "출석";
                     html += `
                         <tr>
@@ -420,12 +432,12 @@
             }
             listBody.innerHTML = html;
 
-            // 3. 누적 랭킹 그리기
+            // 3. 누적 랭킹 그리기 (평균 점수 표시)
             let rankHtml = '<ul style="padding-left: 20px; margin:0;">';
             data.rankList.forEach((p, index) => {
                 let medal = index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉";
                 if(index > 2) medal = "👏";
-                rankHtml += `<li style="margin-bottom:5px;">${medal} <b>${p.name}</b> : ${p.score}회</li>`;
+                rankHtml += `<li style="margin-bottom:5px;">${medal} <b>${p.name}</b> : ${p.score}점</li>`;
             });
             rankHtml += '</ul>';
             if(data.rankList.length === 0) rankHtml = "<p>아직 데이터가 없습니다.</p>";
