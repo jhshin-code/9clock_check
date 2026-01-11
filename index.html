@@ -92,7 +92,8 @@
 
 <script>
     // ================= [설정 영역] =================
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxwKSzvU5hohYGPRyE2oRsJwU73m7K9U9eBO1xmCHx6jy79E7w0A2xHN7bc-FdF1uZ4/exec"; // *** 배포된 URL 입력 ***
+    // ★ 주의: 새로 배포한 웹 앱 URL인지 확인해주세요!
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxwKSzvU5hohYGPRyE2oRsJwU73m7K9U9eBO1xmCHx6jy79E7w0A2xHN7bc-FdF1uZ4/exec"; 
     const TARGET_LAT = 37.195921; 
     const TARGET_LON = 127.101088; 
     const ALLOWED_RADIUS = 300; 
@@ -149,7 +150,6 @@
         document.getElementById('live-clock').innerText = timeString;
 
         // 시간 제한 로직 (주일 08:30 ~ 09:59:59 까지) -> 10:00 되면 닫힘
-        // 테스트가 필요하면 아래 'isSunday' 조건을 주석처리 하세요.
         const isSunday = (day === 0); 
         const currentMin = now.getHours() * 60 + now.getMinutes();
         const startMin = 8 * 60 + 0; // 08:30
@@ -164,7 +164,6 @@
             msgBox.className = "status-msg ok-msg";
         } else {
             isTimeValid = false;
-            // 왜 안되는지 메시지 표시
             if (!isSunday) {
                 msgBox.innerHTML = "⛔ 오늘은 주일이 아닙니다";
             } else if (currentMin < startMin) {
@@ -231,15 +230,45 @@
         checkButtons();
     }
 
-    // 버튼 활성화 규칙 수정
+    // ★ [수정됨] 10분 제한 및 버튼 활성화 규칙 적용
     function checkButtons() {
+        const attendBtn = document.getElementById('attend-btn');
+        const excuseBtn = document.getElementById('excuse-btn');
+
+        // 1. 쿨타임(10분 제한) 체크
+        const lastSubmitTime = localStorage.getItem("last_submit_time");
+        if (lastSubmitTime) {
+            const now = new Date().getTime();
+            const diff = now - parseInt(lastSubmitTime);
+            const limit = 10 * 60 * 1000; // 10분
+
+            if (diff < limit) {
+                // 아직 10분이 안 지났으면 무조건 비활성화
+                const minutesLeft = Math.ceil((limit - diff) / (60 * 1000));
+                
+                attendBtn.disabled = true;
+                attendBtn.innerText = `제출 불가 (${minutesLeft}분 남음)`;
+                
+                excuseBtn.disabled = true;
+                excuseBtn.innerText = `제출 불가 (${minutesLeft}분 남음)`;
+                return; // 여기서 함수 종료 (아래 로직 실행 안 함)
+            }
+        }
+
+        // 쿨타임이 지났거나 없으면 원래 텍스트로 복구
+        if (attendBtn.innerText.includes("제출 불가")) {
+            attendBtn.innerText = "출석 체크";
+            excuseBtn.innerText = "사유 제출";
+        }
+
+        // 2. 기존 버튼 활성화 로직 실행
         const nameSelected = document.getElementById('name-select').value !== "";
         
         // 출석 버튼: [이름선택 O] AND [위치 O] AND [시간 O]
-        document.getElementById('attend-btn').disabled = !(nameSelected && isLocationValid && isTimeValid);
+        attendBtn.disabled = !(nameSelected && isLocationValid && isTimeValid);
         
         // 사유 제출: [이름선택 O] 이면 가능 (시간/위치 상관없이)
-        document.getElementById('excuse-btn').disabled = !nameSelected;
+        excuseBtn.disabled = !nameSelected;
     }
 
     function handleAttendance(type) {
@@ -258,12 +287,32 @@
             note = excuseSelect.value;
         }
 
-        // 버튼 잠금
-        document.getElementById('attend-btn').disabled = true;
-        document.getElementById('excuse-btn').disabled = true;
+        // 버튼 잠금 및 전송 중 표시
+        const btnId = type === 'attend' ? 'attend-btn' : 'excuse-btn';
+        const btn = document.getElementById(btnId);
+        btn.disabled = true;
+        btn.innerText = "전송 중...";
 
-        fetch(GAS_URL, { method: "POST", body: JSON.stringify({ dept, name, note }) })
-        .then(res => res.json()).then(() => { alert("처리되었습니다."); location.reload(); });
+        fetch(GAS_URL, { 
+            method: "POST", 
+            mode: "no-cors", // 중요: Apps Script POST 요청 시 필수
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ dept, name, note }) 
+        })
+        .then(() => { 
+            alert("✅ 처리되었습니다."); 
+            
+            // ★ [추가됨] 성공 시 현재 시간을 저장 (10분 카운트 시작)
+            localStorage.setItem("last_submit_time", new Date().getTime());
+
+            location.reload(); 
+        })
+        .catch(err => {
+            alert("전송 실패. 다시 시도해주세요.");
+            console.error(err);
+            btn.disabled = false;
+            btn.innerText = type === 'attend' ? "출석 체크" : "사유 제출";
+        });
     }
 
     // 통계 기능
