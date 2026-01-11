@@ -198,7 +198,7 @@
         const isSunday = (day === 0); 
         const currentMin = now.getHours() * 60 + now.getMinutes();
         const startMin = 8 * 60 + 0; 
-        const endMin = 10 * 60 + 0;   
+        const endMin = 10 * 60 + 0;    
         const msgBox = document.getElementById('time-msg');
 
         if (isAdminMode) {
@@ -217,21 +217,31 @@
         checkButtons(); 
     }
 
-    // 위치 체크
+    // [수정됨] 위치 체크 함수 (실패해도 버튼 활성화를 위해 계속 진행)
     function checkLocation() {
+        const gpsMsg = document.getElementById('gps-msg');
+        
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition((position) => {
                 const dist = getDistanceFromLatLonInMeters(position.coords.latitude, position.coords.longitude, TARGET_LAT, TARGET_LON);
-                const gpsMsg = document.getElementById('gps-msg');
+                
                 if (dist <= ALLOWED_RADIUS) {
                     isLocationValid = true;
                     gpsMsg.innerHTML = `<span class="gps-ok">📍 위치 인증 완료 (${Math.round(dist)}m)</span>`;
                 } else {
                     isLocationValid = false;
-                    gpsMsg.innerHTML = `<span class="gps-no">❌ 교회와 멉니다 (${Math.round(dist)}m)</span>`;
+                    gpsMsg.innerHTML = `<span class="gps-no">⚠️ 거리 벗어남 (${Math.round(dist)}m) - 수동 체크 가능</span>`;
                 }
                 checkButtons();
-            }, () => { isLocationValid = false; }, { enableHighAccuracy: true });
+            }, (err) => { 
+                isLocationValid = false; 
+                gpsMsg.innerHTML = `<span class="gps-no">⚠️ 위치 확인 불가 - 수동 체크 가능</span>`;
+                checkButtons(); 
+            }, { enableHighAccuracy: true });
+        } else {
+            isLocationValid = false;
+            gpsMsg.innerHTML = `<span class="gps-no">⚠️ GPS 미지원 - 수동 체크 가능</span>`;
+            checkButtons();
         }
     }
 
@@ -270,7 +280,7 @@
         checkButtons();
     }
 
-    // 버튼 활성화 및 쿨타임 체크
+    // [수정됨] 버튼 활성화 체크 (위치 검증 실패해도 버튼은 활성화)
     function checkButtons() {
         const attendBtn = document.getElementById('attend-btn');
         
@@ -290,10 +300,11 @@
         if (attendBtn.innerText.includes("제출 불가")) attendBtn.innerText = "출석체크 하기";
 
         const nameSelected = document.getElementById('name-select').value !== "";
-        attendBtn.disabled = !(nameSelected && isLocationValid && isTimeValid);
+        // 위치(isLocationValid) 조건 삭제 -> 시간과 이름만 있으면 버튼 활성화
+        attendBtn.disabled = !(nameSelected && isTimeValid); 
     }
 
-    // 출석 처리 (일반 & 사유)
+    // [수정됨] 출석 처리 (위치 실패 시 팝업 띄우기)
     function handleAttendance(type) {
         const dept = document.getElementById('dept-select').value;
         const name = document.getElementById('name-select').value;
@@ -303,7 +314,17 @@
 
         if (type === 'attend') {
             if(!isTimeValid) { alert("지금은 출석 체크 시간이 아닙니다."); return; }
+            
+            // ★ 위치가 올바르지 않으면 수동 확인 팝업 띄우기
+            if (!isLocationValid && !isAdminMode) {
+                if (!confirm("⚠️ 현재 위치가 확인되지 않거나 교회와 거리가 멉니다.\n\n교회에 도착하셨습니까?\n(예를 누르면 출석 처리됩니다)")) {
+                    return; // 취소 누르면 여기서 중단
+                }
+            }
+
+            // 위치 인증 통과 or 수동 확인 통과 후 이름 재확인
             if (!confirm(`[${dept} - ${name}] 님이 맞습니까?\n\n'확인'을 누르면 출석됩니다.`)) return;
+
         } else if (type === 'excuse') {
             const reason = document.getElementById('excuse-select-popup').value;
             if (reason === "") { alert("사유를 선택해주세요."); return; }
