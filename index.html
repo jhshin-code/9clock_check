@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트 위치기반 출석부</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Apple SD Gothic Neo', sans-serif; background-color: #f0f2f5; padding: 20px; text-align: center; }
+        
+        /* 메인 컨테이너 (처음엔 숨김 처리 될 수도 있음) */
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        /* PC 로그인 화면 스타일 */
+        #pc-login-screen { 
+            display: none; /* 기본 숨김 */
+            max-width: 400px; margin: 50px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); 
+        }
+
+        h2 { margin-bottom: 20px; color: #333; }
+        select, input { width: 100%; padding: 12px; margin: 8px 0; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box;}
+        #excuse-select { border-color: #6c757d; color: #333; }
+        
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        button { flex: 1; padding: 15px; font-size: 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
+        
+        #attend-btn { background-color: #007bff; }
+        #excuse-btn { background-color: #6c757d; }
+        #stats-btn { background-color: #17a2b8; margin-top: 20px; width: 100%; }
+        #login-btn { background-color: #28a745; margin-top: 10px; width: 100%; }
+        
+        button:disabled { background-color: #ccc; cursor: not-allowed; opacity: 0.7; }
+        .status-msg { margin: 15px 0; font-size: 14px; font-weight: bold; }
+        .gps-status { font-size: 12px; color: #666; margin-bottom: 15px; }
+        .ok { color: #28a745; }
+        .no { color: #dc3545; }
+        
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 10% auto; padding: 20px; width: 90%; max-width: 400px; border-radius: 10px; position: relative; }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #aaa; }
+    </style>
+</head>
+<body>
+
+<div id="pc-login-screen">
+    <h2>💻 PC 접속 제한</h2>
+    <p style="color:#666; font-size:14px; margin-bottom:20px;">PC로 접속하셨습니다.<br>관리자 접속 코드를 입력해주세요.</p>
+    <input type="password" id="pc-access-code" placeholder="접속 코드 입력 (예: 1234)">
+    <button id="login-btn" onclick="checkPcLogin()">접속하기</button>
+</div>
+
+<div id="main-app" class="container" style="display:none;">
+    <h2>📍 위치기반 출석부</h2>
+    <div id="gps-msg" class="gps-status">위치 확인 중...</div>
+    <div id="time-msg" class="status-msg"></div>
+
+    <select id="dept-select" onchange="loadNames()"><option value="">부서 선택</option></select>
+    <select id="name-select" disabled><option value="">이름 선택</option></select>
+
+    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #eee;">
+
+    <select id="excuse-select">
+        <option value="">사유 선택 (미참석 시에만)</option>
+        <option value="출근">출근</option>
+        <option value="입원">입원</option>
+        <option value="경조사">경조사</option>
+        <option value="전도">전도</option>
+    </select>
+
+    <div class="btn-group">
+        <button id="attend-btn" onclick="handleAttendance('attend')" disabled>출석 체크</button>
+        <button id="excuse-btn" onclick="handleAttendance('excuse')" disabled>사유 제출</button>
+    </div>
+    <button id="stats-btn" onclick="openStats()">📊 출석 점수 그래프 보기</button>
+</div>
+
+<div id="statsModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeStats()">&times;</span>
+        <h3>📊 부서별 출석 점수율</h3>
+        <p style="font-size:12px; color:#666; margin-bottom:10px;">09:00 이전: 100점 / 이후 분당 -1점</p>
+        <canvas id="myChart"></canvas>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+        <h3>🏆 지각 없는 출석왕</h3>
+        <div id="rank-list" style="text-align: left; background: #f9f9f9; padding: 10px; border-radius: 8px;">로딩 중...</div>
+    </div>
+</div>
+
+<script>
+    // ================= [설정 영역] =================
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbw1sKmeXDgdGRtl1vReccQYaJG6Jb_suB4QYL_vRyxnOQOGvbAH-OuopFwQo-Xyj66X/exec"; // *** 배포된 URL 입력 ***
+    const TARGET_LAT = 37.5665; 
+    const TARGET_LON = 126.9780; 
+    const ALLOWED_RADIUS = 300; 
+    
+    // [PC 접속 비밀번호 설정]
+    const PC_ACCESS_PASSWORD = "1234"; 
+    // ===============================================
+
+    let membersData = [];
+    let isLocationValid = false; 
+    let myChart = null;
+
+    // 접속 시 실행
+    window.onload = function() {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // 모바일이면 바로 앱 실행
+            initApp();
+        } else {
+            // PC면 로그인 화면 띄우기
+            document.getElementById('pc-login-screen').style.display = 'block';
+            
+            // 엔터키 입력 지원
+            document.getElementById("pc-access-code").addEventListener("keyup", function(event) {
+                if (event.key === "Enter") checkPcLogin();
+            });
+        }
+    };
+
+    // PC 로그인 체크 함수
+    function checkPcLogin() {
+        const inputCode = document.getElementById('pc-access-code').value;
+        if (inputCode === PC_ACCESS_PASSWORD) {
+            alert("접속되었습니다.");
+            document.getElementById('pc-login-screen').style.display = 'none';
+            initApp(); // 앱 시작
+        } else {
+            alert("비밀번호가 틀렸습니다.");
+            document.getElementById('pc-access-code').value = "";
+            document.getElementById('pc-access-code').focus();
+        }
+    }
+
+    // 앱 초기화 및 시작
+    function initApp() {
+        document.getElementById('main-app').style.display = 'block'; // 메인 화면 표시
+        fetchMembers();
+        checkTimeAndLocation();
+    }
+
+    function fetchMembers() {
+        fetch(GAS_URL + "?action=getMembers")
+        .then(res => res.json())
+        .then(data => {
+            membersData = data; 
+            const depts = [...new Set(data.map(item => item[0]))];
+            const deptSelect = document.getElementById('dept-select');
+            depts.forEach(dept => {
+                const opt = document.createElement('option');
+                opt.value = dept; opt.text = dept;
+                deptSelect.appendChild(opt);
+            });
+        });
+    }
+
+    function loadNames() {
+        const dept = document.getElementById('dept-select').value;
+        const nameSelect = document.getElementById('name-select');
+        nameSelect.innerHTML = '<option value="">이름 선택</option>';
+        nameSelect.disabled = false;
+        membersData.filter(r => r[0] === dept).forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r[1]; opt.text = r[1];
+            nameSelect.appendChild(opt);
+        });
+        checkButtons();
+    }
+
+    function checkTimeAndLocation() {
+        document.getElementById('time-msg').innerHTML = "<span class='ok'>✅ 시간 확인됨</span>";
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((position) => {
+                const dist = getDistanceFromLatLonInMeters(position.coords.latitude, position.coords.longitude, TARGET_LAT, TARGET_LON);
+                const gpsMsg = document.getElementById('gps-msg');
+                if (dist <= ALLOWED_RADIUS) {
+                    isLocationValid = true;
+                    gpsMsg.innerHTML = `<span class="ok">📍 위치 인증 완료 (${Math.round(dist)}m)</span>`;
+                } else {
+                    isLocationValid = false;
+                    gpsMsg.innerHTML = `<span class="no">❌ 위치 불일치 (${Math.round(dist)}m)</span>`;
+                }
+                checkButtons();
+            }, () => { isLocationValid = false; checkButtons(); }, { enableHighAccuracy: true });
+        }
+    }
+
+    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371; 
+        const dLat = deg2rad(lat2 - lat1); const dLon = deg2rad(lon2 - lon1);
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1000;
+    }
+    function deg2rad(deg) { return deg * (Math.PI/180); }
+
+    function checkButtons() {
+        const nameSelected = document.getElementById('name-select').value !== "";
+        document.getElementById('excuse-btn').disabled = !nameSelected;
+        document.getElementById('attend-btn').disabled = !(nameSelected && isLocationValid);
+    }
+
+    function handleAttendance(type) {
+        const dept = document.getElementById('dept-select').value;
+        const name = document.getElementById('name-select').value;
+        const excuseSelect = document.getElementById('excuse-select');
+        let note = "정상출석";
+
+        if (type === 'attend') {
+            if (!confirm(`[${name}]님 현재 위치에서 출석 체크하시겠습니까?`)) return;
+        } else if (type === 'excuse') {
+            if (excuseSelect.value === "") { alert("사유를 선택해주세요."); return; }
+            if (!confirm(`[${excuseSelect.value}] 사유로 제출하시겠습니까?`)) return;
+            note = excuseSelect.value;
+        }
+
+        document.getElementById('attend-btn').disabled = true;
+        document.getElementById('excuse-btn').disabled = true;
+        fetch(GAS_URL, { method: "POST", body: JSON.stringify({ dept, name, note }) })
+        .then(res => res.json()).then(() => { alert("처리되었습니다."); location.reload(); });
+    }
+
+    // ============ [통계 및 그래프] ============
+    function openStats() { document.getElementById('statsModal').style.display = "block"; drawStats(); }
+    function closeStats() { document.getElementById('statsModal').style.display = "none"; }
+    window.onclick = function(event) { if (event.target == document.getElementById('statsModal')) closeStats(); }
+
+    function drawStats() {
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const rankDiv = document.getElementById('rank-list');
+        
+        fetch(GAS_URL + "?action=getStats")
+        .then(res => res.json())
+        .then(data => {
+            const stats = data.deptStats;
+            const ranks = data.rankList;
+            const labels = stats.map(d => d.dept);
+            const rates = stats.map(d => d.rate);
+            const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+
+            if (myChart) myChart.destroy(); 
+            myChart = new Chart(ctx, {
+                type: 'bar', 
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '출석 점수율(%)',
+                        data: rates,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: function(v){return v+"%"} } } },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const d = stats[context.dataIndex];
+                                    return `${d.rate}% (${d.earned}점 / ${d.max}점) - 재적 ${d.count}명`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            let html = '<ul style="padding-left: 20px; margin:0;">';
+            ranks.forEach((p, index) => {
+                let medal = index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉";
+                if(index > 2) medal = "👏";
+                html += `<li style="margin-bottom:5px;">${medal} <b>${p.name}</b> : ${p.score}회</li>`;
+            });
+            html += '</ul>';
+            if(ranks.length === 0) html = "<p>아직 데이터가 없습니다.</p>";
+            rankDiv.innerHTML = html;
+        });
+    }
+</script>
+</body>
+</html>
