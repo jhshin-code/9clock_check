@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>주일 말씀 출석부</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
     <style>
         body { font-family: 'Apple SD Gothic Neo', sans-serif; background-color: #f0f2f5; padding: 20px; text-align: center; }
         
@@ -95,8 +97,8 @@
     // ================= [설정 영역] =================
     // ★ 주의: 새로 배포한 웹 앱 URL인지 확인해주세요!
     const GAS_URL = "https://script.google.com/macros/s/AKfycbxwKSzvU5hohYGPRyE2oRsJwU73m7K9U9eBO1xmCHx6jy79E7w0A2xHN7bc-FdF1uZ4/exec"; 
-    const TARGET_LAT = 37.195921; 
-    const TARGET_LON = 127.101088; 
+    const TARGET_LAT = 37.192984; 
+    const TARGET_LON = 127.059825; 
     const ALLOWED_RADIUS = 300; 
     const PC_ACCESS_PASSWORD = "1324"; 
     // ===============================================
@@ -231,7 +233,7 @@
         checkButtons();
     }
 
-    // ★ [수정됨] 10분 제한 및 버튼 활성화 규칙 적용
+    // 10분 제한 및 버튼 활성화 규칙 적용
     function checkButtons() {
         const attendBtn = document.getElementById('attend-btn');
         const excuseBtn = document.getElementById('excuse-btn');
@@ -272,6 +274,7 @@
         excuseBtn.disabled = !nameSelected;
     }
 
+    // ★ [업그레이드] 출석 처리 로직 (팝업 확인 + 폭죽 효과 + 10분 제한 저장)
     function handleAttendance(type) {
         const dept = document.getElementById('dept-select').value;
         const name = document.getElementById('name-select').value;
@@ -281,7 +284,10 @@
         if (type === 'attend') {
             // 시간 한번 더 체크 (해킹 방지)
             if(!isTimeValid) { alert("지금은 출석 체크 시간이 아닙니다."); return; }
-            if (!confirm(`[${name}]님 현재 위치에서 출석 체크하시겠습니까?`)) return;
+            
+            // [추가] 명확한 본인 확인 팝업
+            if (!confirm(`[${dept} - ${name}] 님이 맞습니까?\n\n맞다면 '확인'을 눌러주세요.`)) return;
+            
         } else if (type === 'excuse') {
             if (excuseSelect.value === "") { alert("사유를 선택해주세요."); return; }
             if (!confirm(`[${excuseSelect.value}] 사유로 제출하시겠습니까?`)) return;
@@ -296,17 +302,23 @@
 
         fetch(GAS_URL, { 
             method: "POST", 
-            mode: "no-cors", // 중요: Apps Script POST 요청 시 필수
+            mode: "no-cors", 
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ dept, name, note }) 
         })
         .then(() => { 
-            alert("✅ 처리되었습니다."); 
+            // [추가] 1. 폭죽 터뜨리기! (0.2초 간격으로 양쪽에서)
+            fireConfetti();
             
-            // ★ [추가됨] 성공 시 현재 시간을 저장 (10분 카운트 시작)
-            localStorage.setItem("last_submit_time", new Date().getTime());
-
-            location.reload(); 
+            // [추가] 2. 1.5초 동안 폭죽 감상 후 알림창 띄우기
+            setTimeout(() => {
+                alert(`🎉 [${name}]님 출석 완료!\n오늘도 은혜로운 주일 보내세요!`);
+                
+                // 성공 시 현재 시간을 저장 (10분 카운트 시작)
+                localStorage.setItem("last_submit_time", new Date().getTime());
+                
+                location.reload(); 
+            }, 1500);
         })
         .catch(err => {
             alert("전송 실패. 다시 시도해주세요.");
@@ -314,6 +326,25 @@
             btn.disabled = false;
             btn.innerText = type === 'attend' ? "출석 체크" : "사유 제출";
         });
+    }
+
+    // ★ [추가] 폭죽 애니메이션 함수
+    function fireConfetti() {
+        var duration = 1.5 * 1000;
+        var animationEnd = Date.now() + duration;
+        var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+        function random(min, max) { return Math.random() * (max - min) + min; }
+
+        var interval = setInterval(function() {
+            var timeLeft = animationEnd - Date.now();
+            if (timeLeft <= 0) { return clearInterval(interval); }
+            var particleCount = 50 * (timeLeft / duration);
+            
+            // 화면 양쪽에서 랜덤하게 발사
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: random(0.1, 0.3), y: Math.random() - 0.2 } }));
+            confetti(Object.assign({}, defaults, { particleCount, origin: { x: random(0.7, 0.9), y: Math.random() - 0.2 } }));
+        }, 250);
     }
 
     // 통계 기능
