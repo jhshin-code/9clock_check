@@ -71,12 +71,13 @@
         .rank-name { font-weight: bold; flex: 1; text-align: left; }
         .rank-score { color: var(--primary); font-weight: 700; }
 
-        /* 배지 */
+        /* 배지 스타일 */
         .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; color: white; display: inline-block; min-width: 40px;}
         .bg-ok { background-color: #28a745; }
         .bg-warn { background-color: #ff9800; }
         .bg-no { background-color: #ffc107; color: #333; }
         .bg-info { background-color: #17a2b8; }
+        .bg-danger { background-color: #dc3545; } /* 결석 배지 추가 */
 
         /* 검색 영역 */
         .search-box { display: flex; gap: 5px; margin-bottom: 15px; }
@@ -182,6 +183,7 @@
 
 <script>
     // ================= [설정 영역] =================
+    // ★ 주의: 아래 URL을 새로 배포한 웹앱 URL로 꼭 변경해주세요!
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzfgJEvE3vucqe1U4FyLrTn-o6MzeVgCJvaInmjLfAFZM15reboaPK-cTFInL4Emz3F/exec"; 
     const TARGET_LAT = 37.192984; 
     const TARGET_LON = 127.059825; 
@@ -233,7 +235,7 @@
         
         const isSunday = (day === 0);
         const currentMin = now.getHours() * 60 + now.getMinutes();
-        const startMin = 8 * 60; const endMin = 14 * 60; // 테스트를 위해 시간 14시로 늘림
+        const startMin = 8 * 60; const endMin = 14 * 60; 
         const msgBox = document.getElementById('time-msg');
 
         if (isAdminMode) {
@@ -368,7 +370,6 @@
         const rankDiv = document.getElementById('rank-list');
         listBody.innerHTML = "<tr><td colspan='4'>데이터 불러오는 중...</td></tr>";
 
-        // GAS URL에 ?action=getStats 요청 시, { deptStats: [], todayList: [], rankList: [], allLogs: [] } 형태 기대
         fetch(GAS_URL + "?action=getStats").then(res => res.json()).then(data => {
             // 1. 차트 그리기 (부서별 통계)
             drawChart(data.deptStats);
@@ -380,6 +381,7 @@
                 data.todayList.forEach(log => {
                     let badgeClass = "bg-ok";
                     if(log.note === "지각") badgeClass = "bg-warn";
+                    else if(log.note === "결석") badgeClass = "bg-danger"; // 결석 배지
                     else if(log.note !== "정상출석" && log.note !== "정상") badgeClass = "bg-no";
                     
                     html += `<tr>
@@ -404,8 +406,7 @@
             });
             rankDiv.innerHTML = rankHtml || "<div style='padding:20px; color:#999;'>데이터가 없습니다.</div>";
 
-            // 4. 개인 조회를 위한 전체 데이터 저장 (GAS에서 보내줘야 함)
-            // 만약 GAS가 allLogs를 안 보내면 빈 배열 처리
+            // 4. 개인 조회를 위한 전체 데이터 저장
             fullHistoryData = data.allLogs || []; 
 
         }).catch(err => {
@@ -422,8 +423,8 @@
             data: {
                 labels: stats.map(d => d.dept),
                 datasets: [{
-                    label: '누적 평균 점수', // 제목 변경
-                    data: stats.map(d => d.rate), // GAS에서 누적 평균을 계산해서 보내줘야 함
+                    label: '누적 평균 점수',
+                    data: stats.map(d => d.rate),
                     backgroundColor: 'rgba(54, 162, 235, 0.7)',
                     borderRadius: 6,
                 }]
@@ -437,7 +438,37 @@
         });
     }
 
-    // 개인 조회 기능 (클라이언트 사이드 필터링)
+    // ============================================================
+    // [수정됨] 개인 조회 기능 (결석 자동 생성 로직 포함)
+    // ============================================================
+    
+    // 1. 올해 1월 1일부터 오늘까지의 모든 주일(일요일) 날짜 구하기
+    function getSundaysUntilNow() {
+        let sundays = [];
+        const now = new Date();
+        const year = now.getFullYear(); 
+        
+        let d = new Date(year, 0, 1); 
+
+        // 첫 번째 일요일 찾기
+        while (d.getDay() !== 0) {
+            d.setDate(d.getDate() + 1);
+        }
+
+        // 오늘까지 반복하며 일요일만 배열에 추가
+        while (d <= now) {
+            const yearStr = d.getFullYear();
+            const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+            const dayStr = String(d.getDate()).padStart(2, '0');
+            
+            sundays.push(`${yearStr}-${monthStr}-${dayStr}`);
+            
+            d.setDate(d.getDate() + 7);
+        }
+        return sundays;
+    }
+
+    // 2. 기록 조회 및 결석 채우기
     function searchHistory() {
         const input = document.getElementById('history-search-input').value.trim();
         const resultDiv = document.getElementById('history-result');
@@ -445,34 +476,76 @@
         if(input.length < 2) { alert("이름을 2글자 이상 입력하세요."); return; }
         if(fullHistoryData.length === 0) { alert("전체 기록 데이터가 없습니다. (관리자 문의)"); return; }
 
-        // 이름으로 필터링
-        const filtered = fullHistoryData.filter(log => log.name.includes(input));
+        // 1) 이름으로 필터링
+        const userLogs = fullHistoryData.filter(log => log.name.includes(input));
         
-        if(filtered.length === 0) {
-            resultDiv.innerHTML = `<div style="padding:20px; color:#999;">'${input}'님에 대한 기록이 없습니다.</div>`;
+        // 2) 날짜별 맵핑
+        let logMap = {};
+        userLogs.forEach(log => {
+            logMap[log.date] = log;
+        });
+
+        // 3) 올해 모든 주일 가져오기
+        const allSundays = getSundaysUntilNow();
+        
+        // 4) 결석 포함 리스트 생성
+        let finalHistory = [];
+        let deptName = userLogs.length > 0 ? userLogs[0].dept : "-"; // 부서명 가져오기
+
+        allSundays.forEach(sundayDate => {
+            if (logMap[sundayDate]) {
+                finalHistory.push(logMap[sundayDate]);
+            } else {
+                // 기록 없으면 결석 처리
+                finalHistory.push({
+                    date: sundayDate,
+                    time: "-",
+                    name: input,
+                    dept: deptName,
+                    note: "결석"
+                });
+            }
+        });
+
+        // 최신순 정렬
+        finalHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        if(finalHistory.length === 0) {
+            resultDiv.innerHTML = `<div style="padding:20px; color:#999;">조회된 기록이 없습니다.</div>`;
             return;
         }
 
-        // 결과 테이블 생성
-        filtered.sort((a, b) => new Date(b.date) - new Date(a.date)); // 최신순 정렬 (날짜 필드 필요)
-
-        let html = `<div style="margin-top:10px; font-weight:bold; color:#007bff;">'${input}' 검색 결과 (${filtered.length}건)</div>`;
-        html += `<div style="margin-top:10px; border:1px solid #eee; border-radius:8px; overflow:hidden;"><table class="log-table">`;
-        html += `<thead><tr><th>날짜</th><th>시간</th><th>상태</th></tr></thead><tbody>`;
+        // 5) 결과 출력
+        let html = `<div style="margin-top:10px; font-weight:bold; color:#007bff;">'${input}'님의 출석부</div>`;
         
-        filtered.forEach(log => {
+        const absentCount = finalHistory.filter(l => l.note === "결석").length;
+        html += `<div style="font-size:12px; color:#666; margin-bottom:10px;">총 ${finalHistory.length}회 중 <span style="color:#dc3545;">결석 ${absentCount}회</span></div>`;
+
+        html += `<div style="margin-top:5px; border:1px solid #eee; border-radius:8px; overflow:hidden; max-height: 300px; overflow-y: auto;">
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th style="background:#f8f9fa; position:sticky; top:0;">날짜</th>
+                    <th style="background:#f8f9fa; position:sticky; top:0;">시간</th>
+                    <th style="background:#f8f9fa; position:sticky; top:0;">상태</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        
+        finalHistory.forEach(log => {
             let badge = "bg-ok";
             if(log.note === "지각") badge = "bg-warn";
+            else if(log.note === "결석") badge = "bg-danger"; // 빨간 배지
             else if(log.note !== "정상출석" && log.note !== "정상") badge = "bg-no";
 
-            // GAS 데이터에 date(YYYY-MM-DD), time(HH:mm) 필드가 있다고 가정
             html += `<tr>
-                <td>${log.date || '-'}</td>
+                <td>${log.date}</td>
                 <td>${log.time}</td>
                 <td><span class="badge ${badge}">${log.note}</span></td>
             </tr>`;
         });
         html += `</tbody></table></div>`;
+        
         resultDiv.innerHTML = html;
     }
 
