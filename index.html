@@ -8,60 +8,81 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
-        body { font-family: 'Apple SD Gothic Neo', sans-serif; background-color: #f0f2f5; padding: 20px; text-align: center; color: #333; }
+        :root { --primary: #007bff; --bg-light: #f8f9fa; --text-dark: #333; }
+        body { font-family: 'Apple SD Gothic Neo', sans-serif; background-color: #f0f2f5; padding: 20px; text-align: center; color: var(--text-dark); -webkit-font-smoothing: antialiased; }
         
         /* 메인 컨테이너 */
-        .container { max-width: 450px; margin: 0 auto; background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .container { max-width: 450px; margin: 0 auto; background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
         
-        h2 { margin: 0 0 20px 0; color: #2c3e50; font-size: 24px; }
+        h2 { margin: 0 0 15px 0; color: #2c3e50; font-size: 22px; font-weight: 700; }
         
-        #live-clock { font-size: 28px; font-weight: 800; color: #333; margin-bottom: 5px; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+        /* 시계 및 상태 */
+        #live-clock { font-size: 32px; font-weight: 800; color: #333; margin-bottom: 5px; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+        .status-msg { margin: 10px 0 15px 0; font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 20px; display: inline-block; width: 100%; box-sizing: border-box;}
+        .gps-status { font-size: 12px; color: #888; margin-bottom: 15px; display: block; }
         
-        /* 입력 필드 */
-        select { width: 100%; padding: 14px; margin: 8px 0; font-size: 16px; border-radius: 12px; border: 1px solid #ddd; background-color: #fafafa; outline: none; transition: 0.2s; }
-        select:focus { border-color: #007bff; background-color: white; }
+        .ok-msg { background-color: #e8f5e9; color: #2e7d32; }
+        .no-msg { background-color: #ffebee; color: #c62828; }
+        .test-msg { background-color: #fff8e1; color: #f57f17; }
+        .gps-ok { color: #2e7d32; font-weight: bold; }
+        .gps-no { color: #c62828; font-weight: bold; }
 
-        /* 버튼 */
-        .main-btn { width: 100%; padding: 16px; font-size: 18px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; margin-top: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        /* 입력 폼 */
+        .input-group { text-align: left; margin-top: 20px; background: var(--bg-light); padding: 15px; border-radius: 12px; }
+        label { font-size: 12px; color: #666; font-weight: 600; margin-left: 4px; display: block; margin-bottom: 4px;}
+        select, input[type="text"], input[type="password"] { width: 100%; padding: 12px; margin-bottom: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd; background-color: white; outline: none; box-sizing: border-box; transition: 0.2s; }
+        select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
+
+        /* 버튼 스타일 */
+        .main-btn { width: 100%; padding: 16px; font-size: 17px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; color: white; transition: 0.2s; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,123,255,0.2); }
         #attend-btn { background: linear-gradient(135deg, #007bff, #0056b3); }
         #attend-btn:active { transform: scale(0.98); }
-        #attend-btn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
+        #attend-btn:disabled { background: #e0e0e0; color:#999; cursor: not-allowed; box-shadow: none; }
         
-        /* 링크형 버튼 (사유제출) */
-        .link-btn { background: none; border: none; color: #6c757d; text-decoration: underline; font-size: 14px; margin-top: 15px; cursor: pointer; padding: 10px; }
+        .sub-btn { background: white; border: 1px solid #ddd; color: #555; padding: 12px; border-radius: 10px; width: 100%; margin-top: 10px; font-weight: 600; cursor: pointer; }
+        .link-btn { background: none; border: none; color: #888; text-decoration: underline; font-size: 13px; margin-top: 15px; cursor: pointer; padding: 5px; }
 
-        /* 통계 버튼 */
-        #stats-btn { background-color: #17a2b8; width: 100%; padding: 12px; border:none; border-radius: 10px; color: white; font-weight: bold; margin-top: 30px; cursor: pointer; }
+        /* 모달 (팝업) & 탭 UI */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .modal-content { background-color: white; margin: 5% auto; padding: 0; width: 92%; max-width: 420px; border-radius: 16px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; height: 85vh; display: flex; flex-direction: column; }
+        
+        .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: white; }
+        .modal-header h3 { margin: 0; font-size: 18px; }
+        .close-btn { font-size: 24px; cursor: pointer; color: #aaa; padding: 5px; }
 
-        /* 상태 메시지 */
-        .status-msg { margin: 10px 0 20px 0; font-size: 14px; font-weight: bold; padding: 8px; border-radius: 8px; display: inline-block; width: 100%; box-sizing: border-box;}
-        .gps-status { font-size: 12px; color: #888; margin-bottom: 15px; }
-        
-        .ok-msg { background-color: #d4edda; color: #155724; }
-        .no-msg { background-color: #f8d7da; color: #721c24; }
-        .test-msg { background-color: #fff3cd; color: #856404; }
-        .gps-ok { color: #28a745; font-weight: bold; }
-        .gps-no { color: #dc3545; font-weight: bold; }
+        /* 탭 네비게이션 */
+        .tabs { display: flex; background: #f1f3f5; padding: 4px; border-bottom: 1px solid #ddd; }
+        .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: #777; font-size: 14px; border-radius: 8px; transition: 0.2s; }
+        .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-        /* 모달 (팝업) */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
-        .modal-content { background-color: white; margin: 10% auto; padding: 25px; width: 90%; max-width: 400px; border-radius: 15px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: slideUp 0.3s; max-height: 85vh; overflow-y: auto; }
-        @keyframes slideUp { from {transform: translateY(20px); opacity: 0;} to {transform: translateY(0); opacity: 1;} }
+        /* 탭 내용 영역 */
+        .tab-content { display: none; padding: 20px; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 테이블 및 리스트 */
+        .log-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; }
+        .log-table th { background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; color: #555; position: sticky; top: 0; }
+        .log-table td { padding: 10px; border-bottom: 1px solid #eee; color: #333; }
         
-        .close-btn { position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; color: #aaa; }
-        
-        /* 대시보드 테이블 */
-        .log-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; text-align: center; }
-        .log-table th { background-color: #f8f9fa; padding: 8px; border-bottom: 2px solid #ddd; color: #555; }
-        .log-table td { padding: 8px; border-bottom: 1px solid #eee; color: #333; }
-        .log-table tr:last-child td { border-bottom: none; }
-        
-        /* 배지 스타일 */
-        .badge { padding: 3px 6px; border-radius: 4px; font-size: 11px; color: white; }
-        .bg-ok { background-color: #28a745; }   /* 정상: 초록 */
-        .bg-warn { background-color: #ff9800; } /* 지각: 주황 */
-        .bg-no { background-color: #ffc107; color: #333; } /* 기타: 노랑 */
-        
+        /* 순위 리스트 스타일 */
+        .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f0; }
+        .rank-medal { width: 24px; text-align: center; font-size: 18px; margin-right: 10px; }
+        .rank-name { font-weight: bold; flex: 1; text-align: left; }
+        .rank-score { color: var(--primary); font-weight: 700; }
+
+        /* 배지 */
+        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; color: white; display: inline-block; min-width: 40px;}
+        .bg-ok { background-color: #28a745; }
+        .bg-warn { background-color: #ff9800; }
+        .bg-no { background-color: #ffc107; color: #333; }
+        .bg-info { background-color: #17a2b8; }
+
+        /* 검색 영역 */
+        .search-box { display: flex; gap: 5px; margin-bottom: 15px; }
+        .search-box input { margin: 0; flex: 1; }
+        .search-box button { padding: 0 15px; border-radius: 8px; background: #6c757d; color: white; border: none; font-weight: bold; cursor: pointer; }
+
         /* PC 로그인 */
         #pc-login-screen { display: none; max-width: 400px; margin: 50px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
     </style>
@@ -70,8 +91,8 @@
 
 <div id="pc-login-screen">
     <h2>💻 PC 관리자 접속</h2>
-    <p style="color:#666; font-size:14px; margin-bottom:20px;">PC 접속은 관리자만 가능합니다.<br>비밀번호를 입력해주세요.</p>
-    <input type="password" id="pc-access-code" placeholder="비밀번호 입력">
+    <p style="color:#666; font-size:14px; margin-bottom:20px;">비밀번호를 입력해주세요.</p>
+    <input type="password" id="pc-access-code" placeholder="비밀번호">
     <button class="main-btn" style="background:#28a745;" onclick="checkPcLogin()">접속하기</button>
 </div>
 
@@ -82,27 +103,27 @@
     <div id="time-msg" class="status-msg no-msg">시간 확인 중...</div>
     <div id="gps-msg" class="gps-status">위치 확인 중...</div>
 
-    <div style="text-align: left; margin-top: 20px;">
-        <label style="font-size:13px; color:#666; margin-left:5px;">부서</label>
+    <div class="input-group">
+        <label>부서 선택</label>
         <select id="dept-select" onchange="loadNames()"><option value="">부서 선택</option></select>
         
-        <label style="font-size:13px; color:#666; margin-left:5px;">이름</label>
-        <select id="name-select" disabled><option value="">먼저 부서를 선택하세요</option></select>
+        <label>이름 선택</label>
+        <select id="name-select" disabled><option value="">부서를 먼저 선택하세요</option></select>
     </div>
 
     <button id="attend-btn" class="main-btn" onclick="handleAttendance('attend')" disabled>출석체크 하기</button>
-
     <button class="link-btn" onclick="openExcuseModal()">혹시 못 오셨나요? 사유 제출하기</button>
 
-    <button id="stats-btn" onclick="openStats()">📊 실시간 현황 및 명단 보기</button>
+    <button class="sub-btn" style="background-color: #f1f3f5; color: #333;" onclick="openStats()">
+        📊 현황 및 기록 조회
+    </button>
 </div>
 
 <div id="excuseModal" class="modal">
-    <div class="modal-content">
-        <span class="close-btn" onclick="closeModal('excuseModal')">&times;</span>
-        <h3>📝 사유 제출</h3>
-        <p style="font-size:14px; color:#666;">부득이한 사정으로 참석하지 못할 경우<br>사유를 선택해 주세요.</p>
-        
+    <div class="modal-content" style="height: auto; padding: 25px;">
+        <span class="close-btn" style="position: absolute; top: 10px; right: 15px;" onclick="closeModal('excuseModal')">&times;</span>
+        <h3 style="margin-top:0;">📝 사유 제출</h3>
+        <p style="font-size:14px; color:#666; margin-bottom:15px;">참석하지 못하는 사유를 선택해 주세요.</p>
         <select id="excuse-select-popup">
             <option value="">사유를 선택하세요</option>
             <option value="출근">출근</option>
@@ -110,42 +131,58 @@
             <option value="경조사">경조사</option>
             <option value="전도">전도</option>
         </select>
-        <button class="main-btn" style="background-color:#6c757d; margin-top:10px;" onclick="handleAttendance('excuse')">제출하기</button>
+        <button class="main-btn" style="background-color:#6c757d;" onclick="handleAttendance('excuse')">제출하기</button>
     </div>
 </div>
 
 <div id="statsModal" class="modal">
     <div class="modal-content">
-        <span class="close-btn" onclick="closeModal('statsModal')">&times;</span>
+        <div class="modal-header">
+            <h3>📊 출석 현황판</h3>
+            <span class="close-btn" onclick="closeModal('statsModal')">&times;</span>
+        </div>
         
-        <h3>📊 부서별 출석률</h3>
-        <canvas id="myChart" style="margin-bottom:20px;"></canvas>
-        
-        <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
-        
-        <h3>📋 오늘 출석 명단 </h3>
-        <div style="max-height: 200px; overflow-y: auto; margin-bottom: 20px; border: 1px solid #eee; border-radius: 8px;">
-            <table class="log-table">
-                <thead><tr><th>시간</th><th>이름</th><th>부서</th><th>상태</th></tr></thead>
-                <tbody id="today-log-list"><tr><td colspan="4">로딩 중...</td></tr></tbody>
-            </table>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('tab-today')">오늘 명단</button>
+            <button class="tab-btn" onclick="switchTab('tab-rank')">누적 순위</button>
+            <button class="tab-btn" onclick="switchTab('tab-history')">개인 조회</button>
         </div>
 
-        <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
+        <div id="tab-today" class="tab-content active">
+            <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">📅 오늘 출석 로그</h4>
+            <div style="border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
+                <table class="log-table">
+                    <thead><tr><th width="20%">시간</th><th>이름</th><th width="20%">부서</th><th width="20%">상태</th></tr></thead>
+                    <tbody id="today-log-list"><tr><td colspan="4">로딩 중...</td></tr></tbody>
+                </table>
+            </div>
+            
+            <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
+            
+            <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">📈 부서별 평균 출석률 (누적)</h4>
+            <div style="height: 200px;"><canvas id="deptChart"></canvas></div>
+        </div>
 
-        <h3>🏆 개인 출석 순위 (평균) </h3>
-        <div id="rank-list" style="text-align: left; background: #f9f9f9; padding: 15px; border-radius: 8px; font-size: 14px; max-height: 250px; overflow-y: auto;">
-            로딩 중...
+        <div id="tab-rank" class="tab-content">
+            <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">🏆 출석 우수자 (평균 점수)</h4>
+            <div id="rank-list">로딩 중...</div>
+        </div>
+
+        <div id="tab-history" class="tab-content">
+            <div class="search-box">
+                <input type="text" id="history-search-input" placeholder="이름을 입력하세요 (예: 홍길동)" onkeyup="if(window.event.keyCode==13){searchHistory()}">
+                <button onclick="searchHistory()">검색</button>
+            </div>
+            <div id="history-result">
+                <p style="color:#999; font-size:13px; margin-top:30px;">이름을 입력하고 검색 버튼을 누르면<br>지난 출석 이력이 표시됩니다.</p>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
     // ================= [설정 영역] =================
-    // ★ 주의: 아래 URL을 새로 배포한 웹앱 URL로 꼭 변경해주세요!
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbxoCZJ8syGUfZcGCRwsV-0SyAI1sJzzXBUrYWsQ1vXL2Tbs6j2YZyKnSuu8UQnuOvVO/exec"; 
-    
-    // 교회 좌표 및 설정
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyIhAB61ii_UnYOBqM_TKUAfKu5yCXVvcGQaR8puhndQ9vgdFJ1yay08oVUi1Tg3v0g/exec"; 
     const TARGET_LAT = 37.192984; 
     const TARGET_LON = 127.059825; 
     const ALLOWED_RADIUS = 300; 
@@ -153,21 +190,19 @@
     // ===============================================
 
     let membersData = [];
+    let fullHistoryData = []; // 개인 조회를 위한 전체 데이터 저장소
     let isLocationValid = false; 
     let isTimeValid = false; 
     let isAdminMode = false;
-    let myChart = null;
+    let deptChart = null;
 
-    // 초기 로드
+    // 초기 실행
     window.onload = function() {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile) {
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
             initApp();
         } else {
             document.getElementById('pc-login-screen').style.display = 'block';
-            document.getElementById("pc-access-code").addEventListener("keyup", function(e) {
-                if (e.key === "Enter") checkPcLogin();
-            });
+            document.getElementById("pc-access-code").addEventListener("keyup", (e) => { if (e.key === "Enter") checkPcLogin(); });
         }
     };
 
@@ -183,53 +218,43 @@
         document.getElementById('main-app').style.display = 'block';
         fetchMembers();
         setInterval(updateClockAndStatus, 1000);
-        updateClockAndStatus(); 
-        
+        updateClockAndStatus();
         if (isAdminMode) {
             isLocationValid = true;
             document.getElementById('gps-msg').innerHTML = `<span class="gps-ok">🔧 관리자 모드 (위치 PASS)</span>`;
             checkButtons();
-        } else {
-            checkLocation();
-        }
+        } else { checkLocation(); }
     }
 
-    // 시간 체크
     function updateClockAndStatus() {
         const now = new Date();
         const day = now.getDay(); 
         document.getElementById('live-clock').innerText = now.toLocaleTimeString('ko-KR', { hour12: false });
-
-        const isSunday = (day === 0); 
+        
+        const isSunday = (day === 0);
         const currentMin = now.getHours() * 60 + now.getMinutes();
-        const startMin = 8 * 60 + 0; 
-        const endMin = 10 * 60 + 0;    
+        const startMin = 8 * 60; const endMin = 14 * 60; // 테스트를 위해 시간 14시로 늘림
         const msgBox = document.getElementById('time-msg');
 
         if (isAdminMode) {
             isTimeValid = true;
-            msgBox.innerHTML = "🔧 관리자 모드 (시간 제한 없음)";
-            msgBox.className = "status-msg test-msg";
+            msgBox.innerHTML = "🔧 관리자 모드"; msgBox.className = "status-msg test-msg";
         } else if (isSunday && currentMin >= startMin && currentMin < endMin) {
             isTimeValid = true;
-            msgBox.innerHTML = "✅ 출석 체크 가능 시간입니다";
-            msgBox.className = "status-msg ok-msg";
+            msgBox.innerHTML = "✅ 출석 체크 가능"; msgBox.className = "status-msg ok-msg";
         } else {
             isTimeValid = false;
-            msgBox.innerHTML = !isSunday ? "⛔ 오늘은 주일이 아닙니다" : "⛔ 출석 가능 시간이 아닙니다";
+            msgBox.innerHTML = !isSunday ? "⛔ 주일이 아닙니다" : "⛔ 출석 시간이 아닙니다";
             msgBox.className = "status-msg no-msg";
         }
-        checkButtons(); 
+        checkButtons();
     }
 
-    // [수정됨] 위치 체크 함수 (실패해도 버튼 활성화를 위해 계속 진행)
     function checkLocation() {
         const gpsMsg = document.getElementById('gps-msg');
-        
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition((position) => {
                 const dist = getDistanceFromLatLonInMeters(position.coords.latitude, position.coords.longitude, TARGET_LAT, TARGET_LON);
-                
                 if (dist <= ALLOWED_RADIUS) {
                     isLocationValid = true;
                     gpsMsg.innerHTML = `<span class="gps-ok">📍 위치 인증 완료 (${Math.round(dist)}m)</span>`;
@@ -238,37 +263,27 @@
                     gpsMsg.innerHTML = `<span class="gps-no">⚠️ 거리 벗어남 (${Math.round(dist)}m) - 수동 체크 가능</span>`;
                 }
                 checkButtons();
-            }, (err) => { 
+            }, () => { 
                 isLocationValid = false; 
-                gpsMsg.innerHTML = `<span class="gps-no">⚠️ 위치 확인 불가 - 수동 체크 가능</span>`;
+                gpsMsg.innerHTML = `<span class="gps-no">⚠️ GPS 확인 불가 - 수동 체크 가능</span>`;
                 checkButtons(); 
             }, { enableHighAccuracy: true });
-        } else {
-            isLocationValid = false;
-            gpsMsg.innerHTML = `<span class="gps-no">⚠️ GPS 미지원 - 수동 체크 가능</span>`;
-            checkButtons();
         }
     }
-
+    
     function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-        const R = 6371; 
-        const dLat = deg2rad(lat2 - lat1); const dLon = deg2rad(lon2 - lon1);
+        const R = 6371; const dLat = deg2rad(lat2-lat1); const dLon = deg2rad(lon2-lon1);
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1000;
     }
     function deg2rad(deg) { return deg * (Math.PI/180); }
 
-    // 데이터 로드
     function fetchMembers() {
         fetch(GAS_URL + "?action=getMembers").then(res => res.json()).then(data => {
             membersData = data; 
             const depts = [...new Set(data.map(item => item[0]))];
             const deptSelect = document.getElementById('dept-select');
-            depts.forEach(dept => {
-                const opt = document.createElement('option');
-                opt.value = dept; opt.text = dept;
-                deptSelect.appendChild(opt);
-            });
+            depts.forEach(d => { let opt = document.createElement('option'); opt.value = d; opt.text = d; deptSelect.appendChild(opt); });
         });
     }
 
@@ -278,176 +293,197 @@
         nameSelect.innerHTML = '<option value="">이름을 선택하세요</option>';
         nameSelect.disabled = false;
         membersData.filter(r => r[0] === dept).forEach(r => {
-            const opt = document.createElement('option');
-            opt.value = r[1]; opt.text = r[1];
-            nameSelect.appendChild(opt);
+            let opt = document.createElement('option'); opt.value = r[1]; opt.text = r[1]; nameSelect.appendChild(opt);
         });
         checkButtons();
     }
 
-    // [수정됨] 버튼 활성화 체크 (위치 검증 실패해도 버튼은 활성화)
     function checkButtons() {
         const attendBtn = document.getElementById('attend-btn');
-        
-        // 쿨타임 체크 (관리자는 무시)
-        const lastSubmitTime = localStorage.getItem("last_submit_time");
-        if (lastSubmitTime && !isAdminMode) {
-            const now = new Date().getTime();
-            const diff = now - parseInt(lastSubmitTime);
-            const limit = 10 * 60 * 1000; 
-            if (diff < limit) {
-                const minLeft = Math.ceil((limit - diff) / 60000);
-                attendBtn.disabled = true;
-                attendBtn.innerText = `제출 불가 (${minLeft}분 남음)`;
-                return; 
+        const lastTime = localStorage.getItem("last_submit_time");
+        if (lastTime && !isAdminMode) {
+            const diff = new Date().getTime() - parseInt(lastTime);
+            if (diff < 10 * 60 * 1000) {
+                attendBtn.disabled = true; attendBtn.innerText = `제출 완료 (${Math.ceil((600000 - diff)/60000)}분 대기)`; return;
             }
         }
-        if (attendBtn.innerText.includes("제출 불가")) attendBtn.innerText = "출석체크 하기";
-
-        const nameSelected = document.getElementById('name-select').value !== "";
-        // 위치(isLocationValid) 조건 삭제 -> 시간과 이름만 있으면 버튼 활성화
-        attendBtn.disabled = !(nameSelected && isTimeValid); 
+        attendBtn.innerText = "출석체크 하기";
+        const ready = document.getElementById('name-select').value !== "" && isTimeValid;
+        attendBtn.disabled = !ready;
     }
 
-    // [수정됨] 출석 처리 (위치 실패 시 팝업 띄우기)
     function handleAttendance(type) {
         const dept = document.getElementById('dept-select').value;
         const name = document.getElementById('name-select').value;
         let note = "정상출석";
 
-        if (!dept || !name) { alert("부서와 이름을 먼저 선택해주세요."); return; }
-
+        if (!dept || !name) { alert("부서와 이름을 선택하세요."); return; }
         if (type === 'attend') {
             if(!isTimeValid) { alert("지금은 출석 체크 시간이 아닙니다."); return; }
-            
-            // ★ 위치가 올바르지 않으면 수동 확인 팝업 띄우기
             if (!isLocationValid && !isAdminMode) {
-                if (!confirm("⚠️ 현재 위치가 확인되지 않거나 교회와 거리가 멉니다.\n\n교회에 도착하셨습니까?\n(예를 누르면 출석 처리됩니다)")) {
-                    return; // 취소 누르면 여기서 중단
-                }
+                if (!confirm("⚠️ 현재 위치가 교회와 거리가 멉니다.\n\n교회에 계신가요?\n(확인을 누르면 출석 처리됩니다)")) return;
             }
-
-            // 위치 인증 통과 or 수동 확인 통과 후 이름 재확인
-            if (!confirm(`[${dept} - ${name}] 님이 맞습니까?\n\n'확인'을 누르면 출석됩니다.`)) return;
-
-        } else if (type === 'excuse') {
+            if (!confirm(`[${dept} - ${name}] 님 출석하시겠습니까?`)) return;
+        } else {
             const reason = document.getElementById('excuse-select-popup').value;
-            if (reason === "") { alert("사유를 선택해주세요."); return; }
+            if (!reason) { alert("사유를 선택하세요."); return; }
             if (!confirm(`[${reason}] 사유로 제출하시겠습니까?`)) return;
             note = reason;
         }
 
-        // 전송 중 UI 처리
         const btn = document.getElementById('attend-btn');
-        btn.disabled = true; 
-        btn.innerText = "전송 중...";
+        btn.disabled = true; btn.innerText = "전송 중...";
 
         fetch(GAS_URL, { 
             method: "POST", mode: "no-cors", 
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ dept, name, note }) 
-        })
-        .then(() => { 
+        }).then(() => { 
             if(type === 'attend') fireConfetti(); 
-            setTimeout(() => {
-                alert(`🎉 [${name}]님 출석 체크 완료!`);
+            setTimeout(() => { 
+                alert(`🎉 [${name}]님 처리 완료!`); 
                 localStorage.setItem("last_submit_time", new Date().getTime());
                 location.reload(); 
             }, 1000);
-        })
-        .catch(err => {
-            alert("전송 실패. 관리자에게 문의하세요.");
-            btn.disabled = false;
-        });
+        }).catch(() => { alert("전송 실패. 관리자에게 문의하세요."); btn.disabled = false; });
     }
 
-    // 모달 관련 함수
-    function openExcuseModal() {
-        const dept = document.getElementById('dept-select').value;
-        const name = document.getElementById('name-select').value;
-        if (!dept || !name) { alert("사유 제출 전, 부서와 이름을 먼저 선택해주세요."); return; }
-        document.getElementById('excuseModal').style.display = "block";
-    }
-    function closeModal(id) { document.getElementById(id).style.display = "none"; }
-    window.onclick = function(e) { if(e.target.className === 'modal') e.target.style.display = "none"; }
+    // --- 탭 및 통계 관련 로직 ---
 
-    // 통계 및 명단 보기
     function openStats() { 
         document.getElementById('statsModal').style.display = "block"; 
-        drawStats(); 
+        loadStatsData(); 
     }
 
-    function drawStats() {
-        const ctx = document.getElementById('myChart').getContext('2d');
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    function loadStatsData() {
         const listBody = document.getElementById('today-log-list');
         const rankDiv = document.getElementById('rank-list');
-
         listBody.innerHTML = "<tr><td colspan='4'>데이터 불러오는 중...</td></tr>";
 
+        // GAS URL에 ?action=getStats 요청 시, { deptStats: [], todayList: [], rankList: [], allLogs: [] } 형태 기대
         fetch(GAS_URL + "?action=getStats").then(res => res.json()).then(data => {
-            // 1. 차트 그리기
-            if (myChart) myChart.destroy(); 
-            myChart = new Chart(ctx, {
-                type: 'bar', 
-                data: {
-                    labels: data.deptStats.map(d => d.dept),
-                    datasets: [{
-                        label: '출석 점수율(%)',
-                        data: data.deptStats.map(d => d.rate),
-                        backgroundColor: '#36A2EB',
-                        borderRadius: 5
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: { y: { beginAtZero: true, max: 100 } },
-                    plugins: { legend: { display: false } }
-                }
-            });
+            // 1. 차트 그리기 (부서별 통계)
+            drawChart(data.deptStats);
 
-            // 2. 오늘 명단 리스트 그리기
+            // 2. 오늘 명단
             let html = "";
-            if(data.todayList.length === 0) {
-                html = "<tr><td colspan='4'>아직 출석한 사람이 없습니다.</td></tr>";
-            } else {
+            if(data.todayList.length === 0) html = "<tr><td colspan='4' style='padding:20px; color:#999;'>아직 출석자가 없습니다.</td></tr>";
+            else {
                 data.todayList.forEach(log => {
-                    // ★ 지각 여부에 따른 배지 색상 처리
-                    let badgeClass = "bg-ok"; 
-                    if (log.note === "지각") {
-                        badgeClass = "bg-warn"; // 주황색
-                    } else if (log.note !== "정상출석" && log.note !== "정상") {
-                        badgeClass = "bg-no"; // 노란색
-                    }
-
-                    const noteText = log.note || "출석";
-                    html += `
-                        <tr>
-                            <td>${log.time}</td>
-                            <td><strong>${log.name}</strong></td>
-                            <td>${log.dept}</td>
-                            <td><span class="badge ${badgeClass}">${noteText}</span></td>
-                        </tr>
-                    `;
+                    let badgeClass = "bg-ok";
+                    if(log.note === "지각") badgeClass = "bg-warn";
+                    else if(log.note !== "정상출석" && log.note !== "정상") badgeClass = "bg-no";
+                    
+                    html += `<tr>
+                        <td>${log.time}</td>
+                        <td style="font-weight:bold">${log.name}</td>
+                        <td>${log.dept}</td>
+                        <td><span class="badge ${badgeClass}">${log.note || '출석'}</span></td>
+                    </tr>`;
                 });
             }
             listBody.innerHTML = html;
 
-            // 3. 누적 랭킹 그리기 (평균 점수 표시)
-            let rankHtml = '<ul style="padding-left: 20px; margin:0;">';
-            data.rankList.forEach((p, index) => {
-                let medal = index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉";
-                if(index > 2) medal = "👏";
-                rankHtml += `<li style="margin-bottom:5px;">${medal} <b>${p.name}</b> : ${p.score}점</li>`;
+            // 3. 누적 순위
+            let rankHtml = "";
+            data.rankList.forEach((p, idx) => {
+                let medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "👏";
+                rankHtml += `<div class="rank-item">
+                    <div class="rank-medal">${medal}</div>
+                    <div class="rank-name">${p.name} <span style="font-size:11px; color:#888; font-weight:normal">(${p.dept})</span></div>
+                    <div class="rank-score">${p.score}점</div>
+                </div>`;
             });
-            rankHtml += '</ul>';
-            if(data.rankList.length === 0) rankHtml = "<p>아직 데이터가 없습니다.</p>";
-            rankDiv.innerHTML = rankHtml;
+            rankDiv.innerHTML = rankHtml || "<div style='padding:20px; color:#999;'>데이터가 없습니다.</div>";
+
+            // 4. 개인 조회를 위한 전체 데이터 저장 (GAS에서 보내줘야 함)
+            // 만약 GAS가 allLogs를 안 보내면 빈 배열 처리
+            fullHistoryData = data.allLogs || []; 
+
+        }).catch(err => {
+            listBody.innerHTML = "<tr><td colspan='4'>데이터 로드 실패</td></tr>";
+            console.error(err);
         });
     }
 
+    function drawChart(stats) {
+        const ctx = document.getElementById('deptChart').getContext('2d');
+        if (deptChart) deptChart.destroy();
+        deptChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: stats.map(d => d.dept),
+                datasets: [{
+                    label: '누적 평균 점수', // 제목 변경
+                    data: stats.map(d => d.rate), // GAS에서 누적 평균을 계산해서 보내줘야 함
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, max: 100 } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // 개인 조회 기능 (클라이언트 사이드 필터링)
+    function searchHistory() {
+        const input = document.getElementById('history-search-input').value.trim();
+        const resultDiv = document.getElementById('history-result');
+        
+        if(input.length < 2) { alert("이름을 2글자 이상 입력하세요."); return; }
+        if(fullHistoryData.length === 0) { alert("전체 기록 데이터가 없습니다. (관리자 문의)"); return; }
+
+        // 이름으로 필터링
+        const filtered = fullHistoryData.filter(log => log.name.includes(input));
+        
+        if(filtered.length === 0) {
+            resultDiv.innerHTML = `<div style="padding:20px; color:#999;">'${input}'님에 대한 기록이 없습니다.</div>`;
+            return;
+        }
+
+        // 결과 테이블 생성
+        filtered.sort((a, b) => new Date(b.date) - new Date(a.date)); // 최신순 정렬 (날짜 필드 필요)
+
+        let html = `<div style="margin-top:10px; font-weight:bold; color:#007bff;">'${input}' 검색 결과 (${filtered.length}건)</div>`;
+        html += `<div style="margin-top:10px; border:1px solid #eee; border-radius:8px; overflow:hidden;"><table class="log-table">`;
+        html += `<thead><tr><th>날짜</th><th>시간</th><th>상태</th></tr></thead><tbody>`;
+        
+        filtered.forEach(log => {
+            let badge = "bg-ok";
+            if(log.note === "지각") badge = "bg-warn";
+            else if(log.note !== "정상출석" && log.note !== "정상") badge = "bg-no";
+
+            // GAS 데이터에 date(YYYY-MM-DD), time(HH:mm) 필드가 있다고 가정
+            html += `<tr>
+                <td>${log.date || '-'}</td>
+                <td>${log.time}</td>
+                <td><span class="badge ${badge}">${log.note}</span></td>
+            </tr>`;
+        });
+        html += `</tbody></table></div>`;
+        resultDiv.innerHTML = html;
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = "none"; }
+    function openExcuseModal() { 
+        if(!document.getElementById('name-select').value) { alert("이름을 먼저 선택하세요."); return;}
+        document.getElementById('excuseModal').style.display = "block"; 
+    }
+    window.onclick = function(e) { if(e.target.className === 'modal') e.target.style.display = "none"; }
     function fireConfetti() {
-        var duration = 1000;
-        var end = Date.now() + duration;
+        var end = Date.now() + 1000;
         (function frame() {
             confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 } });
             confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 } });
