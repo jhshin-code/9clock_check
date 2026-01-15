@@ -150,7 +150,7 @@
         </div>
 
         <div id="tab-today" class="tab-content active">
-            <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">📅 오늘 출석 로그</h4>
+            <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">📅 오늘 출석 현황</h4>
             <div style="border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
                 <table class="log-table">
                     <thead><tr><th width="20%">시간</th><th>이름</th><th width="20%">부서</th><th width="20%">상태</th></tr></thead>
@@ -343,7 +343,7 @@
         }).then(() => { 
             if(type === 'attend') fireConfetti(); 
             setTimeout(() => { 
-                alert(`🎉 [${name}]님 처리 완료!`); 
+                alert(`🎉 [${name}]님 출석 체크 완료!`); 
                 localStorage.setItem("last_submit_time", new Date().getTime());
                 location.reload(); 
             }, 1000);
