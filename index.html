@@ -431,31 +431,31 @@
     }
 
     function loadStatsData() {
-        fullHistoryData = data.allLogs || [];
-        window._allLogs = data.allLogs || [];
+    const listBody = document.getElementById('today-log-list');
+    const rankDiv = document.getElementById('rank-list');
+    listBody.innerHTML = "<tr><td colspan='4'>데이터 불러오는 중...</td></tr>";
 
-        // ★ 임시 디버그 - 콘솔에서 확인
-        console.log("allLogs 전체:", window._allLogs);
-        console.log("첫 번째 로그 샘플:", window._allLogs[0]);
-        console.log("allSundays:", getSundaysUntilNow().slice(-3));
-        const listBody = document.getElementById('today-log-list');
-        const rankDiv = document.getElementById('rank-list');
-        listBody.innerHTML = "<tr><td colspan='4'>데이터 불러오는 중...</td></tr>";
+    fetch(GAS_URL + "?action=getStats")
+        .then(res => res.json())
+        .then(data => {
+            // ★ 디버그
+            console.log("allLogs 전체:", data.allLogs);
+            console.log("첫 번째 로그 샘플:", data.allLogs ? data.allLogs[0] : "없음");
+            console.log("allSundays 마지막 3개:", getSundaysUntilNow().slice(-3));
 
-        fetch(GAS_URL + "?action=getStats").then(res => res.json()).then(data => {
-            // 1. 차트 그리기 (부서별 통계)
+            // 1. 차트
             drawChart(data.deptStats);
 
             // 2. 오늘 명단
             let html = "";
-            if(data.todayList.length === 0) html = "<tr><td colspan='4' style='padding:20px; color:#999;'>아직 출석자가 없습니다.</td></tr>";
-            else {
+            if (!data.todayList || data.todayList.length === 0) {
+                html = "<tr><td colspan='4' style='padding:20px; color:#999;'>아직 출석자가 없습니다.</td></tr>";
+            } else {
                 data.todayList.forEach(log => {
                     let badgeClass = "bg-ok";
-                    if(log.note === "지각") badgeClass = "bg-warn";
-                    else if(log.note === "결석") badgeClass = "bg-danger"; 
-                    else if(log.note !== "정상출석" && log.note !== "정상") badgeClass = "bg-no";
-                    
+                    if (log.note === "지각") badgeClass = "bg-warn";
+                    else if (log.note === "결석") badgeClass = "bg-danger";
+                    else if (log.note !== "정상출석" && log.note !== "정상") badgeClass = "bg-no";
                     html += `<tr>
                         <td>${log.time}</td>
                         <td style="font-weight:bold">${log.name}</td>
@@ -467,19 +467,17 @@
             listBody.innerHTML = html;
 
             // 3. 누적 순위
-            // 3. 누적 순위 (분기 필터용으로 저장 후 렌더)
             window._allLogs = data.allLogs || [];
             renderRank('all');
 
-            // 4. 개인 조회를 위한 전체 데이터 저장
-            fullHistoryData = data.allLogs || []; 
-
-        }).catch(err => {
+            // 4. 개인 조회용 전체 데이터
+            fullHistoryData = data.allLogs || [];
+        })
+        .catch(err => {
             listBody.innerHTML = "<tr><td colspan='4'>데이터 로드 실패</td></tr>";
-            console.error(err);
+            console.error("loadStatsData 오류:", err);
         });
-    }
-
+} 
     function drawChart(stats) {
         const ctx = document.getElementById('deptChart').getContext('2d');
         if (deptChart) deptChart.destroy();
