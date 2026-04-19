@@ -431,6 +431,13 @@
     }
 
     function loadStatsData() {
+        fullHistoryData = data.allLogs || [];
+        window._allLogs = data.allLogs || [];
+
+        // ★ 임시 디버그 - 콘솔에서 확인
+        console.log("allLogs 전체:", window._allLogs);
+        console.log("첫 번째 로그 샘플:", window._allLogs[0]);
+        console.log("allSundays:", getSundaysUntilNow().slice(-3));
         const listBody = document.getElementById('today-log-list');
         const rankDiv = document.getElementById('rank-list');
         listBody.innerHTML = "<tr><td colspan='4'>데이터 불러오는 중...</td></tr>";
