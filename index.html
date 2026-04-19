@@ -535,7 +535,7 @@
         const months = getQuarterMonths(q);
         const logs = window._allLogs || [];
 
-        // 1. 해당 분기에 해당하는 주일 목록 계산
+        // 1. 해당 분기 주일 목록
         const allSundays = getSundaysUntilNow().filter(d => {
             if (!months) return true;
             const m = parseInt(d.split('-')[1]);
@@ -547,37 +547,37 @@
             return;
         }
 
-        // 2. 분기 내 로그만 필터
-        const filtered = logs.filter(log => allSundays.includes(log.date));
+        const sundaySet = new Set(allSundays);
 
-        // 3. 로그를 날짜+이름 키로 맵핑 (중복 제출 방지: 같은 날 가장 높은 점수 유지)
-        const logMap = {};
-        filtered.forEach(log => {
+        // 2. 분기 내 로그만 필터 후 "날짜||이름" 키로 맵핑
+        //    같은 날 중복 제출이면 높은 점수 유지
+        const logMap = {}; // key: "2025-04-06||홍길동"
+        logs.forEach(log => {
+            if (!sundaySet.has(log.date)) return;
             const key = log.date + '||' + log.name;
-            const prev = logMap[key];
-            if (!prev || (parseInt(log.score) || 0) > (parseInt(prev.score) || 0)) {
-                logMap[key] = log;
+            const incoming = parseInt(log.score) || 0;
+            if (logMap[key] === undefined || incoming > logMap[key]) {
+                logMap[key] = incoming;
             }
         });
 
-        // 4. 멤버별 집계 — 로그 없는 주일은 0점으로 산입
-        const memberMap = {};
+        // 3. 멤버별로 전체 주일 순회하며 점수 합산
+        //    로그가 없는 주일 = 0점으로 분모에 포함
+        const memberMap = {}; // key: "홍길동||청년부"
         membersData.forEach(r => {
-            const key = r[1] + '||' + r[0]; // name||dept
-            memberMap[key] = { name: r[1], dept: r[0], total: 0, count: allSundays.length };
+            const mKey = r[1] + '||' + r[0];
+            memberMap[mKey] = { name: r[1], dept: r[0], total: 0 };
         });
 
         allSundays.forEach(sunday => {
-            Object.keys(memberMap).forEach(mKey => {
-                const { name } = memberMap[mKey];
-                const logKey = sunday + '||' + name;
-                const log = logMap[logKey];
-                memberMap[mKey].total += log ? (parseInt(log.score) || 0) : 0;
+            Object.entries(memberMap).forEach(([mKey, member]) => {
+                const logKey = sunday + '||' + member.name;
+                memberMap[mKey].total += (logMap[logKey] !== undefined ? logMap[logKey] : 0);
             });
         });
 
         const ranked = Object.values(memberMap)
-            .map(p => ({ ...p, avg: Math.round(p.total / p.count) }))
+            .map(p => ({ ...p, avg: Math.round(p.total / allSundays.length) }))
             .sort((a, b) => b.avg - a.avg)
             .slice(0, 20);
 
