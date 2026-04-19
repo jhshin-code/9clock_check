@@ -86,6 +86,10 @@
 
         /* PC 로그인 */
         #pc-login-screen { display: none; max-width: 400px; margin: 50px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .quarter-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        .q-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 13px; font-weight: 600; color: #666; }
+        .q-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    
     </style>
 </head>
 <body>
@@ -166,6 +170,13 @@
 
         <div id="tab-rank" class="tab-content">
             <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">🏆 출석 우수자 (평균 점수)</h4>
+            <div class="quarter-tabs">
+                <button class="q-btn active" onclick="filterRank('all', this)">전체</button>
+                <button class="q-btn" onclick="filterRank('q1', this)">1분기 (1~3월)</button>
+                <button class="q-btn" onclick="filterRank('q2', this)">2분기 (4~6월)</button>
+                <button class="q-btn" onclick="filterRank('q3', this)">3분기 (7~9월)</button>
+                <button class="q-btn" onclick="filterRank('q4', this)">4분기 (10~12월)</button>
+            </div>
             <div id="rank-list">로딩 중...</div>
         </div>
 
@@ -381,6 +392,8 @@
     // [데이터 전송 통합 함수]
     function sendData(dept, name, note, score, type) {
         const btn = document.getElementById('attend-btn');
+        if (btn.dataset.submitting === "true") return; // 중복 방지
+        btn.dataset.submitting = "true";
         btn.disabled = true; btn.innerText = "전송 중...";
 
         fetch(GAS_URL, { 
@@ -447,16 +460,9 @@
             listBody.innerHTML = html;
 
             // 3. 누적 순위
-            let rankHtml = "";
-            data.rankList.forEach((p, idx) => {
-                let medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : "👏";
-                rankHtml += `<div class="rank-item">
-                    <div class="rank-medal">${medal}</div>
-                    <div class="rank-name">${p.name} <span style="font-size:11px; color:#888; font-weight:normal">(${p.dept})</span></div>
-                    <div class="rank-score">${p.score}점</div>
-                </div>`;
-            });
-            rankDiv.innerHTML = rankHtml || "<div style='padding:20px; color:#999;'>데이터가 없습니다.</div>";
+            // 3. 누적 순위 (분기 필터용으로 저장 후 렌더)
+            window._allLogs = data.allLogs || [];
+            renderRank('all');
 
             // 4. 개인 조회를 위한 전체 데이터 저장
             fullHistoryData = data.allLogs || []; 
@@ -516,7 +522,81 @@
         }
         return sundays;
     }
+    function getQuarterMonths(q) {
+        if (q === 'q1') return [1,2,3];
+        if (q === 'q2') return [4,5,6];
+        if (q === 'q3') return [7,8,9];
+        if (q === 'q4') return [10,11,12];
+        return null; // 전체
+    }
 
+    function renderRank(q) {
+        const rankDiv = document.getElementById('rank-list');
+        const months = getQuarterMonths(q);
+        const logs = window._allLogs || [];
+
+        // 1. 해당 분기에 해당하는 주일 목록 계산
+        const allSundays = getSundaysUntilNow().filter(d => {
+            if (!months) return true;
+            const m = parseInt(d.split('-')[1]);
+            return months.includes(m);
+        });
+
+        if (allSundays.length === 0) {
+            rankDiv.innerHTML = "<div style='padding:20px; color:#999;'>해당 분기 데이터가 없습니다.</div>";
+            return;
+        }
+
+        // 2. 분기 내 로그만 필터
+        const filtered = logs.filter(log => allSundays.includes(log.date));
+
+        // 3. 로그를 날짜+이름 키로 맵핑 (중복 제출 방지: 같은 날 가장 높은 점수 유지)
+        const logMap = {};
+        filtered.forEach(log => {
+            const key = log.date + '||' + log.name;
+            const prev = logMap[key];
+            if (!prev || (parseInt(log.score) || 0) > (parseInt(prev.score) || 0)) {
+                logMap[key] = log;
+            }
+        });
+
+        // 4. 멤버별 집계 — 로그 없는 주일은 0점으로 산입
+        const memberMap = {};
+        membersData.forEach(r => {
+            const key = r[1] + '||' + r[0]; // name||dept
+            memberMap[key] = { name: r[1], dept: r[0], total: 0, count: allSundays.length };
+        });
+
+        allSundays.forEach(sunday => {
+            Object.keys(memberMap).forEach(mKey => {
+                const { name } = memberMap[mKey];
+                const logKey = sunday + '||' + name;
+                const log = logMap[logKey];
+                memberMap[mKey].total += log ? (parseInt(log.score) || 0) : 0;
+            });
+        });
+
+        const ranked = Object.values(memberMap)
+            .map(p => ({ ...p, avg: Math.round(p.total / p.count) }))
+            .sort((a, b) => b.avg - a.avg)
+            .slice(0, 20);
+
+        let html = "";
+        ranked.forEach((p, idx) => {
+            let medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx+1}.`;
+            html += `<div class="rank-item">
+                <div class="rank-medal">${medal}</div>
+                <div class="rank-name">${p.name} <span style="font-size:11px; color:#888; font-weight:normal">(${p.dept})</span></div>
+                <div class="rank-score">${p.avg}점</div>
+            </div>`;
+        });
+        rankDiv.innerHTML = html || "<div style='padding:20px; color:#999;'>데이터가 없습니다.</div>";
+    }
+    function filterRank(q, btn) {
+        document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderRank(q);
+    }
     function searchHistory() {
         const input = document.getElementById('history-search-input').value.trim();
         const resultDiv = document.getElementById('history-result');
