@@ -1127,8 +1127,11 @@
         Object.values(memberMap).forEach(m => {
             let streak = 0;
             for (let i = allSundays.length - 1; i >= 0; i--) {
-                const sc = logMap[allSundays[i] + '||' + m.name];
-                if (sc !== undefined && sc > 0) streak++;
+                const logKey = allSundays[i] + '||' + m.name;
+                const matchedLog = allLogsCache.find(l => l.date === allSundays[i] && l.name === m.name);
+                const note = matchedLog ? matchedLog.note : null;
+                const validStreak = note === '정상출석' || note === '전도';
+                if (validStreak) streak++;
                 else break;
             }
             m.streak = streak;
