@@ -4,131 +4,629 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>주일 말씀 출석부</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
-        :root { --primary: #007bff; --bg-light: #f8f9fa; --text-dark: #333; }
-        body { font-family: 'Apple SD Gothic Neo', sans-serif; background-color: #f0f2f5; padding: 20px; text-align: center; color: var(--text-dark); -webkit-font-smoothing: antialiased; }
-        
-        /* 메인 컨테이너 */
-        .container { max-width: 450px; margin: 0 auto; background: white; padding: 30px 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
-        
-        h2 { margin: 0 0 15px 0; color: #2c3e50; font-size: 22px; font-weight: 700; }
-        
-        /* 시계 및 상태 */
-        #live-clock { font-size: 32px; font-weight: 800; color: #333; margin-bottom: 5px; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
-        .status-msg { margin: 10px 0 15px 0; font-size: 14px; font-weight: 600; padding: 8px 12px; border-radius: 20px; display: inline-block; width: 100%; box-sizing: border-box;}
-        .gps-status { font-size: 12px; color: #888; margin-bottom: 15px; display: block; }
-        
-        .ok-msg { background-color: #e8f5e9; color: #2e7d32; }
-        .no-msg { background-color: #ffebee; color: #c62828; }
-        .test-msg { background-color: #fff8e1; color: #f57f17; }
-        .gps-ok { color: #2e7d32; font-weight: bold; }
-        .gps-no { color: #c62828; font-weight: bold; }
+        :root {
+            --primary: #3b5bdb;
+            --primary-light: #e7f0ff;
+            --accent: #f03e3e;
+            --gold: #f59f00;
+            --green: #2f9e44;
+            --orange: #e67700;
+            --bg: #f0f4ff;
+            --card: #ffffff;
+            --text: #1a1d23;
+            --muted: #6e7990;
+            --border: #e2e8f0;
+            --radius: 16px;
+            --shadow: 0 4px 20px rgba(59,91,219,0.10);
+        }
 
-        /* 입력 폼 */
-        .input-group { text-align: left; margin-top: 20px; background: var(--bg-light); padding: 15px; border-radius: 12px; }
-        label { font-size: 12px; color: #666; font-weight: 600; margin-left: 4px; display: block; margin-bottom: 4px;}
-        select, input[type="text"], input[type="password"] { width: 100%; padding: 12px; margin-bottom: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd; background-color: white; outline: none; box-sizing: border-box; transition: 0.2s; }
-        select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* 버튼 스타일 */
-        .main-btn { width: 100%; padding: 16px; font-size: 17px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; color: white; transition: 0.2s; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,123,255,0.2); }
-        #attend-btn { background: linear-gradient(135deg, #007bff, #0056b3); }
-        #attend-btn:active { transform: scale(0.98); }
-        #attend-btn:disabled { background: #e0e0e0; color:#999; cursor: not-allowed; box-shadow: none; }
-        
-        .sub-btn { background: white; border: 1px solid #ddd; color: #555; padding: 12px; border-radius: 10px; width: 100%; margin-top: 10px; font-weight: 600; cursor: pointer; }
-        .link-btn { background: none; border: none; color: #888; text-decoration: underline; font-size: 13px; margin-top: 15px; cursor: pointer; padding: 5px; }
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
 
-        /* 모달 (팝업) & 탭 UI */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
-        .modal-content { background-color: white; margin: 5% auto; padding: 0; width: 92%; max-width: 420px; border-radius: 16px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden; height: 85vh; display: flex; flex-direction: column; }
-        
-        .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: white; }
-        .modal-header h3 { margin: 0; font-size: 18px; }
-        .close-btn { font-size: 24px; cursor: pointer; color: #aaa; padding: 5px; }
+        /* ====== 메인 앱 ====== */
+        .container {
+            max-width: 440px;
+            margin: 0 auto;
+            background: var(--card);
+            min-height: 100vh;
+            padding: 28px 20px 40px;
+            position: relative;
+        }
 
-        /* 탭 네비게이션 */
-        .tabs { display: flex; background: #f1f3f5; padding: 4px; border-bottom: 1px solid #ddd; }
-        .tab-btn { flex: 1; padding: 12px; border: none; background: transparent; cursor: pointer; font-weight: 600; color: #777; font-size: 14px; border-radius: 8px; transition: 0.2s; }
-        .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .app-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+        .app-header h2 {
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+        .church-icon {
+            width: 36px; height: 36px;
+            background: var(--primary);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+        }
 
-        /* 탭 내용 영역 */
-        .tab-content { display: none; padding: 20px; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
-        .tab-content.active { display: block; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* 시계 카드 */
+        .clock-card {
+            background: linear-gradient(135deg, var(--primary) 0%, #4c6ef5 100%);
+            border-radius: var(--radius);
+            padding: 20px;
+            color: white;
+            margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        .clock-card::before {
+            content: '';
+            position: absolute;
+            top: -30px; right: -30px;
+            width: 120px; height: 120px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+        }
+        #live-clock {
+            font-size: 38px;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -1px;
+            font-family: 'Inter', sans-serif;
+        }
+        #time-msg {
+            font-size: 13px;
+            margin-top: 6px;
+            opacity: 0.9;
+        }
+        .time-ok { color: #a3f5c0; }
+        .time-no { color: #ffb3b3; }
+        .time-admin { color: #ffe066; }
+        #gps-msg {
+            font-size: 12px;
+            margin-top: 4px;
+            opacity: 0.75;
+        }
 
-        /* 테이블 및 리스트 */
-        .log-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; }
-        .log-table th { background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; color: #555; position: sticky; top: 0; }
-        .log-table td { padding: 10px; border-bottom: 1px solid #eee; color: #333; }
-        
-        /* 순위 리스트 스타일 */
-        .rank-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f0; }
-        .rank-medal { width: 24px; text-align: center; font-size: 18px; margin-right: 10px; }
-        .rank-name { font-weight: bold; flex: 1; text-align: left; }
-        .rank-score { color: var(--primary); font-weight: 700; }
+        /* 입력 카드 */
+        .input-card {
+            background: var(--bg);
+            border-radius: var(--radius);
+            padding: 18px;
+            margin-bottom: 14px;
+        }
+        .input-row { display: flex; gap: 10px; }
+        .input-col { flex: 1; }
+        .input-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            display: block;
+        }
+        select {
+            width: 100%;
+            padding: 12px 10px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Noto Sans KR', sans-serif;
+            background: white;
+            outline: none;
+            transition: border 0.2s;
+            color: var(--text);
+        }
+        select:focus { border-color: var(--primary); }
 
-        /* 배지 스타일 */
-        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; color: white; display: inline-block; min-width: 40px; white-space: nowrap;}
-        .bg-ok { background-color: #28a745; }
-        .bg-warn { background-color: #ff9800; }
-        .bg-no { background-color: #ffc107; color: #333; }
-        .bg-info { background-color: #17a2b8; }
-        .bg-danger { background-color: #dc3545; }
+        /* 버튼들 */
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            font-size: 16px;
+            font-weight: 700;
+            border-radius: 14px;
+            border: none;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--primary), #4c6ef5);
+            color: white;
+            letter-spacing: -0.3px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(59,91,219,0.3);
+        }
+        .btn-primary:disabled {
+            background: #dce1ec;
+            color: #9aa3b5;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        .btn-primary:not(:disabled):active { transform: scale(0.98); }
 
-        /* 검색 영역 */
-        .search-box { display: flex; gap: 5px; margin-bottom: 15px; }
-        .search-box input { margin: 0; flex: 1; }
-        .search-box button { padding: 0 15px; border-radius: 8px; background: #6c757d; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .btn-outline {
+            width: 100%;
+            padding: 13px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 12px;
+            border: 1.5px solid var(--border);
+            background: white;
+            color: var(--text);
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.15s;
+        }
+        .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+
+        .btn-link {
+            background: none;
+            border: none;
+            color: var(--muted);
+            font-size: 13px;
+            text-decoration: underline;
+            cursor: pointer;
+            display: block;
+            text-align: center;
+            margin-top: 12px;
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        /* ====== 모달 ====== */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(15,20,40,0.55);
+            backdrop-filter: blur(6px);
+        }
+        .modal-sheet {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: white;
+            border-radius: 24px 24px 0 0;
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: slideUp 0.3s cubic-bezier(0.34,1.2,0.64,1);
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .modal-handle {
+            width: 40px; height: 4px;
+            background: #ddd;
+            border-radius: 4px;
+            margin: 12px auto 0;
+            flex-shrink: 0;
+        }
+        .modal-header {
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .modal-title { font-size: 17px; font-weight: 800; }
+        .close-btn {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--muted);
+        }
+
+        /* ====== 출석 현황판 탭 ====== */
+        .dashboard-tabs {
+            display: flex;
+            padding: 12px 16px 0;
+            gap: 6px;
+            flex-shrink: 0;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .dashboard-tabs::-webkit-scrollbar { display: none; }
+        .dtab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1.5px solid var(--border);
+            background: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            color: var(--muted);
+            font-family: 'Noto Sans KR', sans-serif;
+            transition: all 0.15s;
+        }
+        .dtab.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* 탭 패널 스크롤 영역 */
+        .dashboard-body {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 16px;
+        }
+
+        /* 섹션 카드 */
+        .section-card {
+            background: var(--bg);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--muted);
+            letter-spacing: 0.3px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .section-title .count-badge {
+            background: var(--primary);
+            color: white;
+            font-size: 11px;
+            padding: 2px 7px;
+            border-radius: 10px;
+        }
+
+        /* 오늘 명단 */
+        .today-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .today-item:last-child { border-bottom: none; }
+        .avatar {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .today-name { font-weight: 700; font-size: 14px; flex: 1; }
+        .today-meta { font-size: 11px; color: var(--muted); }
+
+        /* 배지 */
+        .badge {
+            padding: 3px 9px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .badge-ok { background: #d3f9d8; color: #2f9e44; }
+        .badge-warn { background: #fff3bf; color: #e67700; }
+        .badge-danger { background: #ffe3e3; color: #c92a2a; }
+        .badge-info { background: #d0ebff; color: #1971c2; }
+        .badge-grey { background: #f1f3f5; color: #868e96; }
+
+        /* 분기 필터 */
+        .quarter-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .q-chip {
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1.5px solid var(--border);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            background: white;
+            color: var(--muted);
+            font-family: 'Noto Sans KR', sans-serif;
+            transition: all 0.15s;
+        }
+        .q-chip.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* 차트 래퍼 */
+        .chart-wrap { height: 200px; position: relative; }
+
+        /* 랭킹 */
+        .rank-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .rank-item:last-child { border-bottom: none; }
+        .rank-num {
+            width: 28px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 900;
+            font-family: 'Inter', sans-serif;
+            color: var(--muted);
+        }
+        .rank-num.gold { color: #f59f00; }
+        .rank-num.silver { color: #868e96; }
+        .rank-num.bronze { color: #c9843c; }
+        .rank-info { flex: 1; }
+        .rank-name { font-weight: 700; font-size: 14px; }
+        .rank-dept { font-size: 11px; color: var(--muted); }
+        .rank-score {
+            font-weight: 800;
+            font-size: 15px;
+            color: var(--primary);
+            font-family: 'Inter', sans-serif;
+        }
+        .streak-badge {
+            font-size: 12px;
+            background: #fff3bf;
+            color: #c77c00;
+            padding: 2px 7px;
+            border-radius: 8px;
+            font-weight: 700;
+        }
+
+        /* 개인 조회 */
+        .search-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .search-row input {
+            flex: 1;
+            padding: 11px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: 'Noto Sans KR', sans-serif;
+            outline: none;
+            transition: border 0.2s;
+        }
+        .search-row input:focus { border-color: var(--primary); }
+        .search-row button {
+            padding: 0 18px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        /* 달력 히트맵 */
+        .heatmap-wrap {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .hmap-day {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 700;
+            cursor: default;
+        }
+        .hmap-absent { background: #ffe3e3; color: #c92a2a; }
+        .hmap-perfect { background: #d3f9d8; color: #2f9e44; }
+        .hmap-late { background: #fff3bf; color: #c77c00; }
+        .hmap-excuse { background: #d0ebff; color: #1971c2; }
+        .hmap-future { background: #f1f3f5; color: #ced4da; }
+
+        /* 요약 스탯 */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .stat-box {
+            background: white;
+            border-radius: 12px;
+            padding: 14px 10px;
+            text-align: center;
+        }
+        .stat-val {
+            font-size: 24px;
+            font-weight: 900;
+            font-family: 'Inter', sans-serif;
+            color: var(--primary);
+        }
+        .stat-lbl {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        /* 부서별 현황 */
+        .dept-member-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .dept-member-item:last-child { border-bottom: none; }
 
         /* PC 로그인 */
-        #pc-login-screen { display: none; max-width: 400px; margin: 50px auto; background: white; padding: 40px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-        .quarter-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-        .q-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 13px; font-weight: 600; color: #666; }
-        .q-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-    
+        #pc-login-screen {
+            display: none;
+            max-width: 400px;
+            margin: 60px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+        #pc-login-screen h2 { font-size: 22px; font-weight: 900; color: var(--primary); margin-bottom: 8px; }
+        #pc-login-screen p { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+        #pc-access-code {
+            width: 100%;
+            padding: 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            margin-bottom: 14px;
+            outline: none;
+            font-family: 'Noto Sans KR', sans-serif;
+            text-align: center;
+            letter-spacing: 4px;
+        }
+        #pc-access-code:focus { border-color: var(--primary); }
+
+        /* 간단 모달 (사유제출) */
+        .simple-modal-content {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 20px;
+            padding: 28px 24px;
+            width: 88%;
+            max-width: 380px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .simple-modal-content h3 { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+        .simple-modal-content p { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+        .simple-modal-content select { margin-bottom: 14px; }
+
+        /* 스켈레톤 */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f4ff 25%, #e2e8f0 50%, #f0f4ff 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            from { background-position: 200% 0; }
+            to { background-position: -200% 0; }
+        }
+
+        /* 빈 상태 */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--muted);
+        }
+        .empty-state .icon { font-size: 40px; margin-bottom: 10px; }
+        .empty-state p { font-size: 14px; }
+
+        /* 진행 바 */
+        .progress-bar {
+            height: 6px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--primary), #748ffc);
+            transition: width 0.6s ease;
+        }
     </style>
 </head>
 <body>
 
+<!-- PC 로그인 -->
 <div id="pc-login-screen">
     <h2>💻 PC 관리자 접속</h2>
-    <p style="color:#666; font-size:14px; margin-bottom:20px;">비밀번호를 입력해주세요.</p>
-    <input type="password" id="pc-access-code" placeholder="비밀번호">
-    <button class="main-btn" style="background:#28a745;" onclick="checkPcLogin()">접속하기</button>
+    <p>비밀번호를 입력해주세요.</p>
+    <input type="password" id="pc-access-code" placeholder="••••">
+    <button class="btn-primary" onclick="checkPcLogin()">접속하기</button>
 </div>
 
+<!-- 메인 앱 -->
 <div id="main-app" class="container" style="display:none;">
-    <h2>⛪ 주일 말씀 출석부</h2>
-    
-    <div id="live-clock">00:00:00</div>
-    <div id="time-msg" class="status-msg no-msg">시간 확인 중...</div>
-    <div id="gps-msg" class="gps-status">위치 확인 중...</div>
-
-    <div class="input-group">
-        <label>부서 선택</label>
-        <select id="dept-select" onchange="loadNames()"><option value="">부서 선택</option></select>
-        
-        <label>이름 선택</label>
-        <select id="name-select" disabled><option value="">부서를 먼저 선택하세요</option></select>
+    <div class="app-header">
+        <div class="church-icon">⛪</div>
+        <h2>주일 말씀 출석부</h2>
     </div>
 
-    <button id="attend-btn" class="main-btn" onclick="handleAttendance('attend')" disabled>출석체크 하기</button>
-    <button class="link-btn" onclick="openExcuseModal()">혹시 못 오셨나요? 사유 제출하기</button>
+    <!-- 시계 카드 -->
+    <div class="clock-card">
+        <div id="live-clock">00:00:00</div>
+        <div id="time-msg" class="time-no">시간 확인 중...</div>
+        <div id="gps-msg">위치 확인 중...</div>
+    </div>
 
-    <button class="sub-btn" style="background-color: #f1f3f5; color: #333;" onclick="openStats()">
-        📊 현황 및 기록 조회
+    <!-- 부서/이름 선택 -->
+    <div class="input-card">
+        <div class="input-row">
+            <div class="input-col">
+                <span class="input-label">부서</span>
+                <select id="dept-select" onchange="loadNames()">
+                    <option value="">선택</option>
+                </select>
+            </div>
+            <div class="input-col">
+                <span class="input-label">이름</span>
+                <select id="name-select" disabled>
+                    <option value="">부서 먼저</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <button id="attend-btn" class="btn-primary" onclick="handleAttendance('attend')" disabled>
+        출석체크 하기
+    </button>
+    <button class="btn-link" onclick="openExcuseModal()">못 오셨나요? 사유 제출하기</button>
+
+    <button class="btn-outline" onclick="openStats()">
+        📊 출석 현황판 보기
     </button>
 </div>
 
+<!-- 사유 제출 모달 -->
 <div id="excuseModal" class="modal">
-    <div class="modal-content" style="height: auto; padding: 25px;">
-        <span class="close-btn" style="position: absolute; top: 10px; right: 15px;" onclick="closeModal('excuseModal')">&times;</span>
-        <h3 style="margin-top:0;">📝 사유 제출</h3>
-        <p style="font-size:14px; color:#666; margin-bottom:15px;">참석하지 못하는 사유를 선택해 주세요.</p>
+    <div class="simple-modal-content">
+        <button class="close-btn" style="position:absolute; top:14px; right:14px;" onclick="closeModal('excuseModal')">✕</button>
+        <h3>📝 사유 제출</h3>
+        <p>참석하지 못하는 사유를 선택해 주세요.</p>
         <select id="excuse-select-popup">
             <option value="">사유를 선택하세요</option>
             <option value="출근">출근</option>
@@ -136,86 +634,129 @@
             <option value="경조사">경조사</option>
             <option value="전도">전도</option>
         </select>
-        <button class="main-btn" style="background-color:#6c757d;" onclick="handleAttendance('excuse')">제출하기</button>
+        <button class="btn-primary" onclick="handleAttendance('excuse')">제출하기</button>
     </div>
 </div>
 
+<!-- 출석 현황판 (바텀 시트) -->
 <div id="statsModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
         <div class="modal-header">
-            <h3>📊 출석 현황판</h3>
-            <span class="close-btn" onclick="closeModal('statsModal')">&times;</span>
-        </div>
-        
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('tab-today')">오늘 명단</button>
-            <button class="tab-btn" onclick="switchTab('tab-rank')">누적 순위</button>
-            <button class="tab-btn" onclick="switchTab('tab-history')">개인 조회</button>
+            <div class="modal-title">📊 출석 현황판</div>
+            <button class="close-btn" onclick="closeModal('statsModal')">✕</button>
         </div>
 
-        <div id="tab-today" class="tab-content active">
-            <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">📅 오늘 출석 현황</h4>
-            <div style="border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
-                <table class="log-table">
-                    <thead><tr><th width="20%">시간</th><th>이름</th><th width="20%">부서</th><th width="20%">상태</th></tr></thead>
-                    <tbody id="today-log-list"><tr><td colspan="4">로딩 중...</td></tr></tbody>
-                </table>
+        <!-- 탭 -->
+        <div class="dashboard-tabs">
+            <button class="dtab active" onclick="switchDTab('dt-today', this)">📅 오늘</button>
+            <button class="dtab" onclick="switchDTab('dt-dept', this)">🏛 부서별</button>
+            <button class="dtab" onclick="switchDTab('dt-rank', this)">🏆 개인 순위</button>
+            <button class="dtab" onclick="switchDTab('dt-history', this)">🔍 개인 조회</button>
+        </div>
+
+        <!-- ===== 패널: 오늘 ===== -->
+        <div id="dt-today" class="dashboard-body" style="display:block;">
+            <div class="section-card">
+                <div class="section-title">
+                    <span>📅 오늘 출석 명단</span>
+                    <span class="count-badge" id="today-count">0명</span>
+                </div>
+                <div id="today-log-list">
+                    <div class="skeleton" style="height:48px; margin-bottom:8px;"></div>
+                    <div class="skeleton" style="height:48px; margin-bottom:8px;"></div>
+                    <div class="skeleton" style="height:48px;"></div>
+                </div>
             </div>
-            
-            <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
-            
-            <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">📈 부서별 평균 출석률 (누적)</h4>
-            <div style="height: 200px;"><canvas id="deptChart"></canvas></div>
         </div>
 
-        <div id="tab-rank" class="tab-content">
-            <h4 style="text-align:left; margin:0 0 10px 0; font-size:14px; color:#555;">🏆 출석 우수자 (평균 점수)</h4>
-            <div class="quarter-tabs">
-                <button class="q-btn active" onclick="filterRank('all', this)">전체</button>
-                <button class="q-btn" onclick="filterRank('q1', this)">1분기 (1~3월)</button>
-                <button class="q-btn" onclick="filterRank('q2', this)">2분기 (4~6월)</button>
-                <button class="q-btn" onclick="filterRank('q3', this)">3분기 (7~9월)</button>
-                <button class="q-btn" onclick="filterRank('q4', this)">4분기 (10~12월)</button>
+        <!-- ===== 패널: 부서별 ===== -->
+        <div id="dt-dept" class="dashboard-body" style="display:none;">
+            <div class="section-card">
+                <div class="section-title">📈 부서별 평균 출석 점수</div>
+                <div class="quarter-row" id="dept-quarter-row">
+                    <button class="q-chip active" onclick="changeDeptQ('all', this)">전체</button>
+                    <button class="q-chip" onclick="changeDeptQ('q1', this)">1분기</button>
+                    <button class="q-chip" onclick="changeDeptQ('q2', this)">2분기</button>
+                    <button class="q-chip" onclick="changeDeptQ('q3', this)">3분기</button>
+                    <button class="q-chip" onclick="changeDeptQ('q4', this)">4분기</button>
+                </div>
+                <div class="chart-wrap"><canvas id="deptChart"></canvas></div>
             </div>
-            <div id="rank-list">로딩 중...</div>
+
+            <!-- 부서별 멤버 현황 -->
+            <div class="section-card">
+                <div class="section-title">🏛 부서별 오늘 참석 현황</div>
+                <div id="dept-member-list">
+                    <div class="skeleton" style="height:40px; margin-bottom:8px;"></div>
+                    <div class="skeleton" style="height:40px;"></div>
+                </div>
+            </div>
         </div>
 
-        <div id="tab-history" class="tab-content">
-            <div class="search-box">
-                <input type="text" id="history-search-input" placeholder="이름을 입력하세요 (예: 홍길동)" onkeyup="if(window.event.keyCode==13){searchHistory()}">
+        <!-- ===== 패널: 개인 순위 ===== -->
+        <div id="dt-rank" class="dashboard-body" style="display:none;">
+            <div class="section-card">
+                <div class="section-title">🏆 출석 우수자 (평균 점수)</div>
+                <div class="quarter-row">
+                    <button class="q-chip active" onclick="filterRank('all', this)">전체</button>
+                    <button class="q-chip" onclick="filterRank('q1', this)">1분기</button>
+                    <button class="q-chip" onclick="filterRank('q2', this)">2분기</button>
+                    <button class="q-chip" onclick="filterRank('q3', this)">3분기</button>
+                    <button class="q-chip" onclick="filterRank('q4', this)">4분기</button>
+                </div>
+                <div id="rank-list">
+                    <div class="skeleton" style="height:50px; margin-bottom:8px;"></div>
+                    <div class="skeleton" style="height:50px; margin-bottom:8px;"></div>
+                    <div class="skeleton" style="height:50px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 패널: 개인 조회 ===== -->
+        <div id="dt-history" class="dashboard-body" style="display:none;">
+            <div class="search-row">
+                <input type="text" id="history-search-input" placeholder="이름 검색 (예: 홍길동)"
+                       onkeyup="if(event.key==='Enter') searchHistory()">
                 <button onclick="searchHistory()">검색</button>
             </div>
             <div id="history-result">
-                <p style="color:#999; font-size:13px; margin-top:30px;">이름을 입력하고 검색 버튼을 누르면<br>지난 출석 이력이 표시됩니다.</p>
+                <div class="empty-state">
+                    <div class="icon">🔍</div>
+                    <p>이름을 입력하고 검색하면<br>출석 기록이 나타납니다.</p>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // ================= [설정 영역] =================
-    // ★ 주의: 아래 URL을 새로 배포한 웹앱 URL로 꼭 변경해주세요!
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzklpaIk25KJeltzEtXTFm0YKNQyXKSWrcyDPqUiNFj_5gn6ISdRowyq8MvoXhxfInm/exec"; 
-    const TARGET_LAT = 37.192984; 
-    const TARGET_LON = 127.059825; 
-    const ALLOWED_RADIUS = 300; 
-    const PC_ACCESS_PASSWORD = "1324"; 
-    // ===============================================
+    // ===== 설정 =====
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzklpaIk25KJeltzEtXTFm0YKNQyXKSWrcyDPqUiNFj_5gn6ISdRowyq8MvoXhxfInm/exec";
+    const TARGET_LAT = 37.192984;
+    const TARGET_LON = 127.059825;
+    const ALLOWED_RADIUS = 300;
+    const PC_ACCESS_PASSWORD = "1324";
+    // ================
 
     let membersData = [];
-    let fullHistoryData = []; 
-    let isLocationValid = false; 
-    let isTimeValid = false; 
+    let fullHistoryData = [];
+    let isLocationValid = false;
+    let isTimeValid = false;
     let isAdminMode = false;
     let deptChart = null;
+    let allLogsCache = [];
+    let deptStatsCache = [];
+    let todayListCache = [];
+    let currentDeptQ = 'all';
 
-    // 초기 실행
-    window.onload = function() {
+    // ---- 초기화 ----
+    window.onload = function () {
         if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
             initApp();
         } else {
             document.getElementById('pc-login-screen').style.display = 'block';
-            document.getElementById("pc-access-code").addEventListener("keyup", (e) => { if (e.key === "Enter") checkPcLogin(); });
+            document.getElementById("pc-access-code").addEventListener("keyup", e => { if (e.key === "Enter") checkPcLogin(); });
         }
     };
 
@@ -234,154 +775,118 @@
         updateClockAndStatus();
         if (isAdminMode) {
             isLocationValid = true;
-            document.getElementById('gps-msg').innerHTML = `<span class="gps-ok">🔧 관리자 모드 (위치 PASS)</span>`;
+            document.getElementById('gps-msg').innerHTML = '🔧 관리자 모드 (위치 PASS)';
             checkButtons();
         } else { checkLocation(); }
     }
 
     function updateClockAndStatus() {
         const now = new Date();
-        const day = now.getDay(); 
+        const day = now.getDay();
         document.getElementById('live-clock').innerText = now.toLocaleTimeString('ko-KR', { hour12: false });
-        
-        const isSunday = (day === 0);
         const currentMin = now.getHours() * 60 + now.getMinutes();
-        
-        // -----------------------------------------------------------
-        // [설정] 08:00 ~ 10:00 까지만 가능 (10시 0분 0초 되면 닫힘)
-        // -----------------------------------------------------------
-        const startMin = 8 * 60; 
-        const endMin = 10 * 60; 
-
-        const msgBox = document.getElementById('time-msg');
-
+        const startMin = 8 * 60, endMin = 10 * 60;
+        const msgEl = document.getElementById('time-msg');
         if (isAdminMode) {
             isTimeValid = true;
-            msgBox.innerHTML = "🔧 관리자 모드"; msgBox.className = "status-msg test-msg";
-        } else if (isSunday && currentMin >= startMin && currentMin < endMin) {
+            msgEl.textContent = '🔧 관리자 모드';
+            msgEl.className = 'time-admin';
+        } else if (day === 0 && currentMin >= startMin && currentMin < endMin) {
             isTimeValid = true;
-            msgBox.innerHTML = "✅ 출석 체크 가능 (08:00 ~ 10:00)"; msgBox.className = "status-msg ok-msg";
+            msgEl.textContent = '✅ 출석 체크 가능 (08:00 ~ 10:00)';
+            msgEl.className = 'time-ok';
         } else {
             isTimeValid = false;
-            msgBox.innerHTML = !isSunday ? "⛔ 주일이 아닙니다" : "⛔ 출석 시간이 아닙니다 (08~10시)";
-            msgBox.className = "status-msg no-msg";
+            msgEl.textContent = day !== 0 ? '⛔ 주일이 아닙니다' : '⛔ 출석 시간이 아닙니다 (08~10시)';
+            msgEl.className = 'time-no';
         }
         checkButtons();
     }
 
     function checkLocation() {
-        const gpsMsg = document.getElementById('gps-msg');
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition((position) => {
-                const dist = getDistanceFromLatLonInMeters(position.coords.latitude, position.coords.longitude, TARGET_LAT, TARGET_LON);
-                if (dist <= ALLOWED_RADIUS) {
-                    isLocationValid = true;
-                    gpsMsg.innerHTML = `<span class="gps-ok">📍 위치 인증 완료 (${Math.round(dist)}m)</span>`;
-                } else {
-                    isLocationValid = false;
-                    gpsMsg.innerHTML = `<span class="gps-no">⚠️ 거리 벗어남 (${Math.round(dist)}m) - 수동 체크 가능</span>`;
-                }
-                checkButtons();
-            }, () => { 
-                isLocationValid = false; 
-                gpsMsg.innerHTML = `<span class="gps-no">⚠️ GPS 확인 불가 - 수동 체크 가능</span>`;
-                checkButtons(); 
-            }, { enableHighAccuracy: true });
-        }
+        const gpsEl = document.getElementById('gps-msg');
+        if (!navigator.geolocation) return;
+        navigator.geolocation.watchPosition(pos => {
+            const dist = getDistance(pos.coords.latitude, pos.coords.longitude, TARGET_LAT, TARGET_LON);
+            if (dist <= ALLOWED_RADIUS) {
+                isLocationValid = true;
+                gpsEl.textContent = `📍 위치 인증 완료 (${Math.round(dist)}m)`;
+            } else {
+                isLocationValid = false;
+                gpsEl.textContent = `⚠️ 거리 벗어남 (${Math.round(dist)}m)`;
+            }
+            checkButtons();
+        }, () => {
+            isLocationValid = false;
+            gpsEl.textContent = '⚠️ GPS 확인 불가 - 수동 체크 가능';
+            checkButtons();
+        }, { enableHighAccuracy: true });
     }
-    
-    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
-        const R = 6371; const dLat = deg2rad(lat2-lat1); const dLon = deg2rad(lon2-lon1);
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1000;
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1000;
     }
-    function deg2rad(deg) { return deg * (Math.PI/180); }
 
     function fetchMembers() {
-        fetch(GAS_URL + "?action=getMembers").then(res => res.json()).then(data => {
-            membersData = data; 
-            const depts = [...new Set(data.map(item => item[0]))];
-            const deptSelect = document.getElementById('dept-select');
-            depts.forEach(d => { let opt = document.createElement('option'); opt.value = d; opt.text = d; deptSelect.appendChild(opt); });
+        fetch(GAS_URL + "?action=getMembers").then(r => r.json()).then(data => {
+            membersData = data;
+            const depts = [...new Set(data.map(r => r[0]))];
+            const sel = document.getElementById('dept-select');
+            depts.forEach(d => { const o = document.createElement('option'); o.value = d; o.text = d; sel.appendChild(o); });
         });
     }
 
     function loadNames() {
         const dept = document.getElementById('dept-select').value;
-        const nameSelect = document.getElementById('name-select');
-        nameSelect.innerHTML = '<option value="">이름을 선택하세요</option>';
-        nameSelect.disabled = false;
+        const sel = document.getElementById('name-select');
+        sel.innerHTML = '<option value="">이름 선택</option>';
+        sel.disabled = false;
         membersData.filter(r => r[0] === dept).forEach(r => {
-            let opt = document.createElement('option'); opt.value = r[1]; opt.text = r[1]; nameSelect.appendChild(opt);
+            const o = document.createElement('option'); o.value = r[1]; o.text = r[1]; sel.appendChild(o);
         });
         checkButtons();
     }
 
     function checkButtons() {
-        const attendBtn = document.getElementById('attend-btn');
+        const btn = document.getElementById('attend-btn');
         const lastTime = localStorage.getItem("last_submit_time");
         if (lastTime && !isAdminMode) {
             const diff = new Date().getTime() - parseInt(lastTime);
             if (diff < 10 * 60 * 1000) {
-                attendBtn.disabled = true; attendBtn.innerText = `제출 완료 (${Math.ceil((600000 - diff)/60000)}분 대기)`; return;
+                btn.disabled = true;
+                btn.innerText = `제출 완료 (${Math.ceil((600000 - diff) / 60000)}분 대기)`;
+                return;
             }
         }
-        attendBtn.innerText = "출석체크 하기";
-        const ready = document.getElementById('name-select').value !== "" && isTimeValid;
-        attendBtn.disabled = !ready;
+        btn.innerText = "출석체크 하기";
+        btn.disabled = !(document.getElementById('name-select').value && isTimeValid);
     }
 
     function handleAttendance(type) {
         const dept = document.getElementById('dept-select').value;
         const name = document.getElementById('name-select').value;
-        
-        // 1. 유효성 검사
         if (!dept || !name) { alert("부서와 이름을 선택하세요."); return; }
-        
+
         if (type === 'attend') {
-            if(!isTimeValid && !isAdminMode) { alert("출석 체크 시간(08:00 ~ 10:00)이 아닙니다."); return; }
+            if (!isTimeValid && !isAdminMode) { alert("출석 체크 시간(08:00~10:00)이 아닙니다."); return; }
             if (!isLocationValid && !isAdminMode) {
-                if (!confirm("⚠️ 현재 위치가 교회와 거리가 멉니다.\n\n교회에 계신가요?\n(확인을 누르면 출석 처리됩니다)")) return;
+                if (!confirm("⚠️ 위치가 교회와 멉니다.\n교회에 계신가요? (확인 시 출석 처리)")) return;
             }
-
-            // -------------------------------------------
-            // [핵심] 시간별 점수 계산 (08시, 09시)
-            // -------------------------------------------
             const now = new Date();
-            const hour = now.getHours();   // 시
-            const min = now.getMinutes();  // 분
-            
-            let note = "정상출석";
-            let score = 100;
+            const hour = now.getHours(), min = now.getMinutes();
+            let note = "정상출석", score = 100;
+            if (hour === 9) { note = "지각"; score = 91 - min; }
+            else if (hour !== 8) { note = "기타"; score = 0; }
 
-            if (hour === 8) {
-                // 08:00 ~ 08:59 -> 정상
-                note = "정상출석";
-                score = 100;
-            } else if (hour === 9) {
-                // 09:00 ~ 09:59 -> 지각
-                note = "지각";
-                score = 91 - min; 
-            } else {
-                // 그 외 (관리자 등)
-                note = "기타"; 
-                score = 0; 
-            }
-
-            let confirmMsg = `[${dept} - ${name}] 님 출석하시겠습니까?`;
-            if (note === "지각") {
-                confirmMsg += `\n\n⚠️ 09시가 넘어 [지각] 처리됩니다.\n(예상 점수: ${score}점)`;
-            } else {
-                confirmMsg += `\n\n✅ [정상출석] 입니다.\n(점수: 100점)`;
-            }
-
-            if (!confirm(confirmMsg)) return;
-            
-            // 데이터 전송
+            let msg = `[${dept} - ${name}] 출석하시겠습니까?\n`;
+            msg += note === "지각"
+                ? `\n⚠️ 09시 넘어 지각 처리 (예상 ${score}점)`
+                : `\n✅ 정상출석 (100점)`;
+            if (!confirm(msg)) return;
             sendData(dept, name, note, score, type);
-
         } else {
-            // 사유 제출 로직 (점수 0점)
             const reason = document.getElementById('excuse-select-popup').value;
             if (!reason) { alert("사유를 선택하세요."); return; }
             if (!confirm(`[${reason}] 사유로 제출하시겠습니까?`)) return;
@@ -389,301 +894,370 @@
         }
     }
 
-    // [데이터 전송 통합 함수]
     function sendData(dept, name, note, score, type) {
         const btn = document.getElementById('attend-btn');
-        if (btn.dataset.submitting === "true") return; // 중복 방지
+        if (btn.dataset.submitting === "true") return;
         btn.dataset.submitting = "true";
         btn.disabled = true; btn.innerText = "전송 중...";
-
-        fetch(GAS_URL, { 
-            method: "POST", mode: "no-cors", 
+        fetch(GAS_URL, {
+            method: "POST", mode: "no-cors",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ dept, name, note, score }) 
-        }).then(() => { 
-            if(type === 'attend') fireConfetti(); 
-            setTimeout(() => { 
-                // 메시지 구분
-                if(type === 'attend') {
-                    alert(`🎉 [${name}]님 출석 체크 완료!\n(${note}, ${score}점)`); 
-                } else {
-                    alert(`✅ 사유 제출 완료되었습니다.`);
-                }
+            body: JSON.stringify({ dept, name, note, score })
+        }).then(() => {
+            if (type === 'attend') fireConfetti();
+            setTimeout(() => {
+                alert(type === 'attend' ? `🎉 [${name}]님 출석 완료! (${note}, ${score}점)` : `✅ 사유 제출 완료!`);
                 localStorage.setItem("last_submit_time", new Date().getTime());
-                location.reload(); 
+                location.reload();
             }, 1000);
         }).catch(() => { alert("전송 실패. 관리자에게 문의하세요."); btn.disabled = false; });
     }
 
-    // --- 탭 및 통계 관련 로직 ---
-
-    function openStats() { 
-        document.getElementById('statsModal').style.display = "block"; 
-        loadStatsData(); 
+    // ===== 현황판 탭 =====
+    function openStats() {
+        document.getElementById('statsModal').style.display = "block";
+        loadStatsData();
     }
 
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-        
-        document.getElementById(tabId).classList.add('active');
-        event.currentTarget.classList.add('active');
+    function switchDTab(tabId, btn) {
+        document.querySelectorAll('.dashboard-body').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.dtab').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        btn.classList.add('active');
     }
 
     function loadStatsData() {
-    const listBody = document.getElementById('today-log-list');
-    const rankDiv = document.getElementById('rank-list');
-    listBody.innerHTML = "<tr><td colspan='4'>데이터 불러오는 중...</td></tr>";
+        fetch(GAS_URL + "?action=getStats")
+            .then(r => r.json())
+            .then(data => {
+                allLogsCache = data.allLogs || [];
+                deptStatsCache = data.deptStats || [];
+                todayListCache = data.todayList || [];
+                fullHistoryData = allLogsCache;
 
-    fetch(GAS_URL + "?action=getStats")
-        .then(res => res.json())
-        .then(data => {
-            // ★ 디버그
-            console.log("allLogs 전체:", data.allLogs);
-            console.log("첫 번째 로그 샘플:", data.allLogs ? data.allLogs[0] : "없음");
-            console.log("allSundays 마지막 3개:", getSundaysUntilNow().slice(-3));
+                renderToday(data.todayList || []);
+                drawDeptChart(deptStatsCache, 'all');
+                renderDeptMembers(data.todayList || []);
+                renderRank('all');
+            })
+            .catch(err => console.error("loadStatsData 오류:", err));
+    }
 
-            // 1. 차트
-            drawChart(data.deptStats);
+    // ===== 오늘 명단 =====
+    function renderToday(list) {
+        const wrap = document.getElementById('today-log-list');
+        document.getElementById('today-count').textContent = list.length + '명';
+        if (list.length === 0) {
+            wrap.innerHTML = '<div class="empty-state"><div class="icon">🙏</div><p>아직 출석자가 없습니다.</p></div>';
+            return;
+        }
+        wrap.innerHTML = list.map(log => {
+            let badgeClass = 'badge-ok', noteText = log.note || '출석';
+            if (log.note === '지각') badgeClass = 'badge-warn';
+            else if (log.note === '결석') badgeClass = 'badge-danger';
+            else if (!['정상출석', '정상'].includes(log.note)) badgeClass = 'badge-info';
+            const initial = log.name ? log.name[0] : '?';
+            return `<div class="today-item">
+                <div class="avatar">${initial}</div>
+                <div style="flex:1">
+                    <div class="today-name">${log.name}</div>
+                    <div class="today-meta">${log.dept} · ${log.time}</div>
+                </div>
+                <span class="badge ${badgeClass}">${noteText}</span>
+            </div>`;
+        }).join('');
+    }
 
-            // 2. 오늘 명단
-            let html = "";
-            if (!data.todayList || data.todayList.length === 0) {
-                html = "<tr><td colspan='4' style='padding:20px; color:#999;'>아직 출석자가 없습니다.</td></tr>";
-            } else {
-                data.todayList.forEach(log => {
-                    let badgeClass = "bg-ok";
-                    if (log.note === "지각") badgeClass = "bg-warn";
-                    else if (log.note === "결석") badgeClass = "bg-danger";
-                    else if (log.note !== "정상출석" && log.note !== "정상") badgeClass = "bg-no";
-                    html += `<tr>
-                        <td>${log.time}</td>
-                        <td style="font-weight:bold">${log.name}</td>
-                        <td>${log.dept}</td>
-                        <td><span class="badge ${badgeClass}">${log.note || '출석'}</span></td>
-                    </tr>`;
-                });
-            }
-            listBody.innerHTML = html;
+    // ===== 부서별 차트 (분기 지원) =====
+    function changeDeptQ(q, btn) {
+        currentDeptQ = q;
+        document.querySelectorAll('#dept-quarter-row .q-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const months = getQuarterMonths(q);
 
-            // 3. 누적 순위
-            window._allLogs = data.allLogs || [];
-            renderRank('all');
+        // 분기별로 allLogs에서 재계산
+        if (q === 'all') {
+            drawDeptChart(deptStatsCache, q);
+            return;
+        }
 
-            // 4. 개인 조회용 전체 데이터
-            fullHistoryData = data.allLogs || [];
-        })
-        .catch(err => {
-            listBody.innerHTML = "<tr><td colspan='4'>데이터 로드 실패</td></tr>";
-            console.error("loadStatsData 오류:", err);
+        // 분기별 통계 재계산
+        const sundays = getSundaysUntilNow().filter(d => {
+            const m = parseInt(d.split('-')[1]);
+            return months.includes(m);
         });
-} 
-    function drawChart(stats) {
+        const sundaySet = new Set(sundays);
+
+        // 부서별 재적
+        const deptTotal = {};
+        membersData.forEach(r => {
+            const d = r[0];
+            if (!deptTotal[d]) deptTotal[d] = 0;
+            deptTotal[d]++;
+        });
+
+        const deptScoreSum = {}, deptDateSet = {};
+        allLogsCache.forEach(log => {
+            if (!sundaySet.has(log.date)) return;
+            const score = parseInt(log.score) || 0;
+            if (!deptScoreSum[log.dept]) { deptScoreSum[log.dept] = 0; deptDateSet[log.dept] = new Set(); }
+            deptScoreSum[log.dept] += score;
+            deptDateSet[log.dept].add(log.date);
+        });
+
+        const stats = Object.keys(deptScoreSum).map(d => {
+            const mc = deptTotal[d] || 1;
+            const sc = deptDateSet[d].size;
+            return { dept: d, rate: sc > 0 ? Math.round(deptScoreSum[d] / (mc * sc)) : 0 };
+        }).sort((a, b) => b.rate - a.rate);
+
+        drawDeptChart(stats, q);
+    }
+
+    function drawDeptChart(stats, q) {
         const ctx = document.getElementById('deptChart').getContext('2d');
         if (deptChart) deptChart.destroy();
+        const colors = ['#4c6ef5','#3bc9db','#69db7c','#ffd43b','#ff6b6b','#cc5de8','#fd7e14'];
         deptChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: stats.map(d => d.dept),
                 datasets: [{
-                    label: '누적 평균 점수',
                     data: stats.map(d => d.rate),
-                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                    borderRadius: 6,
+                    backgroundColor: stats.map((_, i) => colors[i % colors.length] + 'cc'),
+                    borderRadius: 8,
+                    borderSkipped: false
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true, max: 100 } },
+                responsive: true, maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, max: 100, grid: { color: '#f0f0f0' }, ticks: { font: { size: 11 } } },
+                    x: { ticks: { font: { size: 12, weight: '700' } } }
+                },
                 plugins: { legend: { display: false } }
             }
         });
     }
 
-    // ============================================================
-    // 개인 조회 기능
-    // ============================================================
-    
+    // ===== 부서별 오늘 참석 현황 =====
+    function renderDeptMembers(todayList) {
+        const wrap = document.getElementById('dept-member-list');
+        const todayNames = new Set(todayList.map(l => l.name));
+
+        // 부서별 집계
+        const deptMap = {};
+        membersData.forEach(r => {
+            const dept = r[0], name = r[1];
+            if (!deptMap[dept]) deptMap[dept] = { total: 0, present: 0 };
+            deptMap[dept].total++;
+            if (todayNames.has(name)) deptMap[dept].present++;
+        });
+
+        const rows = Object.entries(deptMap).sort((a, b) => (b[1].present / b[1].total) - (a[1].present / a[1].total));
+        wrap.innerHTML = rows.map(([dept, d]) => {
+            const pct = Math.round((d.present / d.total) * 100);
+            const barColor = pct >= 80 ? '#2f9e44' : pct >= 50 ? '#e67700' : '#c92a2a';
+            return `<div class="dept-member-item" style="flex-direction:column; align-items:stretch; padding:10px 0;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span style="font-weight:700; font-size:13px;">${dept}</span>
+                    <span style="font-size:12px; color:var(--muted);">${d.present} / ${d.total}명 (${pct}%)</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width:${pct}%; background:${barColor};"></div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ===== 개인 순위 =====
     function getSundaysUntilNow() {
-        let sundays = [];
         const now = new Date();
-        const year = now.getFullYear(); 
-        
-        let d = new Date(year, 0, 1); 
-
-        while (d.getDay() !== 0) {
-            d.setDate(d.getDate() + 1);
-        }
-
+        let d = new Date(now.getFullYear(), 0, 1);
+        while (d.getDay() !== 0) d.setDate(d.getDate() + 1);
+        const sundays = [];
         while (d <= now) {
-            const yearStr = d.getFullYear();
-            const monthStr = String(d.getMonth() + 1).padStart(2, '0');
-            const dayStr = String(d.getDate()).padStart(2, '0');
-            
-            sundays.push(`${yearStr}-${monthStr}-${dayStr}`);
-            
+            sundays.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
             d.setDate(d.getDate() + 7);
         }
         return sundays;
     }
+
     function getQuarterMonths(q) {
-        if (q === 'q1') return [1,2,3];
-        if (q === 'q2') return [4,5,6];
-        if (q === 'q3') return [7,8,9];
-        if (q === 'q4') return [10,11,12];
-        return null; // 전체
+        return { q1:[1,2,3], q2:[4,5,6], q3:[7,8,9], q4:[10,11,12] }[q] || null;
     }
 
     function renderRank(q) {
         const rankDiv = document.getElementById('rank-list');
         const months = getQuarterMonths(q);
-        const logs = window._allLogs || [];
-
-        // 1. 해당 분기 주일 목록
+        const logs = allLogsCache;
         const allSundays = getSundaysUntilNow().filter(d => {
             if (!months) return true;
-            const m = parseInt(d.split('-')[1]);
-            return months.includes(m);
+            return months.includes(parseInt(d.split('-')[1]));
         });
-
         if (allSundays.length === 0) {
-            rankDiv.innerHTML = "<div style='padding:20px; color:#999;'>해당 분기 데이터가 없습니다.</div>";
+            rankDiv.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>해당 분기 데이터가 없습니다.</p></div>';
             return;
         }
-
         const sundaySet = new Set(allSundays);
 
-        // 2. 분기 내 로그만 필터 후 "날짜||이름" 키로 맵핑
-        //    같은 날 중복 제출이면 높은 점수 유지
-        const logMap = {}; // key: "2025-04-06||홍길동"
+        // 날짜||이름 → 최고점
+        const logMap = {};
         logs.forEach(log => {
             if (!sundaySet.has(log.date)) return;
             const key = log.date + '||' + log.name;
-            const incoming = parseInt(log.score) || 0;
-            if (logMap[key] === undefined || incoming > logMap[key]) {
-                logMap[key] = incoming;
-            }
+            const sc = parseInt(log.score) || 0;
+            if (logMap[key] === undefined || sc > logMap[key]) logMap[key] = sc;
         });
 
-        // 3. 멤버별로 전체 주일 순회하며 점수 합산
-        //    로그가 없는 주일 = 0점으로 분모에 포함
-        const memberMap = {}; // key: "홍길동||청년부"
+        // 멤버별 합산
+        const memberMap = {};
         membersData.forEach(r => {
-            const mKey = r[1] + '||' + r[0];
-            memberMap[mKey] = { name: r[1], dept: r[0], total: 0 };
+            memberMap[r[1] + '||' + r[0]] = { name: r[1], dept: r[0], total: 0, streak: 0 };
         });
 
         allSundays.forEach(sunday => {
-            Object.entries(memberMap).forEach(([mKey, member]) => {
-                const logKey = sunday + '||' + member.name;
-                memberMap[mKey].total += (logMap[logKey] !== undefined ? logMap[logKey] : 0);
+            Object.entries(memberMap).forEach(([mKey, m]) => {
+                const lKey = sunday + '||' + m.name;
+                memberMap[mKey].total += (logMap[lKey] !== undefined ? logMap[lKey] : 0);
             });
+        });
+
+        // 연속 출석 계산 (최근 기준)
+        Object.values(memberMap).forEach(m => {
+            let streak = 0;
+            for (let i = allSundays.length - 1; i >= 0; i--) {
+                const sc = logMap[allSundays[i] + '||' + m.name];
+                if (sc !== undefined && sc > 0) streak++;
+                else break;
+            }
+            m.streak = streak;
         });
 
         const ranked = Object.values(memberMap)
             .map(p => ({ ...p, avg: Math.round(p.total / allSundays.length) }))
-            .sort((a, b) => b.avg - a.avg)
-            .slice(0, 20);
+            .sort((a, b) => b.avg - a.avg).slice(0, 20);
 
-        let html = "";
-        ranked.forEach((p, idx) => {
-            let medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx+1}.`;
-            html += `<div class="rank-item">
-                <div class="rank-medal">${medal}</div>
-                <div class="rank-name">${p.name} <span style="font-size:11px; color:#888; font-weight:normal">(${p.dept})</span></div>
+        rankDiv.innerHTML = ranked.map((p, i) => {
+            const medals = ['🥇','🥈','🥉'];
+            const numClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+            const num = medals[i] || `${i+1}`;
+            const streakHtml = p.streak >= 3 ? `<span class="streak-badge">🔥 ${p.streak}주 연속</span>` : '';
+            return `<div class="rank-item">
+                <div class="rank-num ${numClass}">${num}</div>
+                <div class="rank-info">
+                    <div class="rank-name">${p.name} ${streakHtml}</div>
+                    <div class="rank-dept">${p.dept}</div>
+                </div>
                 <div class="rank-score">${p.avg}점</div>
             </div>`;
-        });
-        rankDiv.innerHTML = html || "<div style='padding:20px; color:#999;'>데이터가 없습니다.</div>";
+        }).join('');
     }
+
     function filterRank(q, btn) {
-        document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('#dt-rank .q-chip').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         renderRank(q);
     }
+
+    // ===== 개인 조회 (히트맵 포함) =====
     function searchHistory() {
         const input = document.getElementById('history-search-input').value.trim();
         const resultDiv = document.getElementById('history-result');
-        
-        if(input.length < 2) { alert("이름을 2글자 이상 입력하세요."); return; }
-        if(fullHistoryData.length === 0) { alert("전체 기록 데이터가 없습니다. (관리자 문의)"); return; }
+        if (input.length < 2) { alert("이름을 2글자 이상 입력하세요."); return; }
+        if (fullHistoryData.length === 0) { alert("데이터가 없습니다. 잠시 후 다시 시도하세요."); return; }
 
         const userLogs = fullHistoryData.filter(log => log.name.includes(input));
-        
-        let logMap = {};
-        userLogs.forEach(log => {
-            logMap[log.date] = log;
-        });
+        const logMap = {};
+        userLogs.forEach(log => { logMap[log.date] = log; });
 
         const allSundays = getSundaysUntilNow();
-        
-        let finalHistory = [];
-        let deptName = userLogs.length > 0 ? userLogs[0].dept : "-"; 
+        const deptName = userLogs.length > 0 ? userLogs[0].dept : '-';
 
-        allSundays.forEach(sundayDate => {
-            if (logMap[sundayDate]) {
-                finalHistory.push(logMap[sundayDate]);
-            } else {
-                finalHistory.push({
-                    date: sundayDate,
-                    time: "-",
-                    name: input,
-                    dept: deptName,
-                    note: "결석"
-                });
-            }
-        });
+        const finalHistory = allSundays.map(sd => logMap[sd] || { date: sd, time: '-', name: input, dept: deptName, note: '결석', score: 0 });
 
-        finalHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+        // 통계
+        const total = finalHistory.length;
+        const presentCount = finalHistory.filter(l => l.note !== '결석').length;
+        const absentCount = total - presentCount;
+        const lateCount = finalHistory.filter(l => l.note === '지각').length;
+        const avgScore = total > 0 ? Math.round(finalHistory.reduce((s, l) => s + (parseInt(l.score) || 0), 0) / total) : 0;
 
-        if(finalHistory.length === 0) {
-            resultDiv.innerHTML = `<div style="padding:20px; color:#999;">조회된 기록이 없습니다.</div>`;
-            return;
+        // 연속 출석
+        let streak = 0;
+        for (let i = finalHistory.length - 1; i >= 0; i--) {
+            if (finalHistory[i].note !== '결석' && finalHistory[i].note !== '') streak++;
+            else break;
         }
 
-        let html = `<div style="margin-top:10px; font-weight:bold; color:#007bff;">'${input}'님의 출석부</div>`;
-        
-        const absentCount = finalHistory.filter(l => l.note === "결석").length;
-        html += `<div style="font-size:12px; color:#666; margin-bottom:10px;">총 ${finalHistory.length}회 중 <span style="color:#dc3545;">결석 ${absentCount}회</span></div>`;
+        resultDiv.innerHTML = `
+            <div style="font-weight:900; font-size:16px; color:var(--primary); margin-bottom:12px;">${input}님의 출석부 <span style="font-size:13px; color:var(--muted); font-weight:400;">(${deptName})</span></div>
 
-        html += `<div style="margin-top:5px; border:1px solid #eee; border-radius:8px; overflow:hidden; max-height: 300px; overflow-y: auto;">
-        <table class="log-table">
-            <thead>
-                <tr>
-                    <th style="background:#f8f9fa; position:sticky; top:0;">날짜</th>
-                    <th style="background:#f8f9fa; position:sticky; top:0;">시간</th>
-                    <th style="background:#f8f9fa; position:sticky; top:0;">상태</th>
-                </tr>
-            </thead>
-            <tbody>`;
-        
-        finalHistory.forEach(log => {
-            let badge = "bg-ok";
-            if(log.note === "지각") badge = "bg-warn";
-            else if(log.note === "결석") badge = "bg-danger"; 
-            else if(log.note !== "정상출석" && log.note !== "정상") badge = "bg-no";
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-val">${presentCount}</div>
+                    <div class="stat-lbl">출석 횟수</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" style="color:#c92a2a;">${absentCount}</div>
+                    <div class="stat-lbl">결석 횟수</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val">${avgScore}</div>
+                    <div class="stat-lbl">평균 점수</div>
+                </div>
+            </div>
 
-            html += `<tr>
-                <td>${log.date}</td>
-                <td>${log.time}</td>
-                <td><span class="badge ${badge}">${log.note}</span></td>
-            </tr>`;
-        });
-        html += `</tbody></table></div>`;
-        
-        resultDiv.innerHTML = html;
+            ${streak >= 2 ? `<div style="background:#fff3bf; color:#c77c00; border-radius:10px; padding:10px 14px; font-weight:700; font-size:13px; margin-bottom:12px;">🔥 현재 ${streak}주 연속 출석 중!</div>` : ''}
+
+            <div class="section-card" style="margin-bottom:14px;">
+                <div class="section-title">📆 출석 히트맵 (올해)</div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:8px;">
+                    <span style="font-size:11px; color:var(--muted);">
+                        <span style="display:inline-block;width:12px;height:12px;background:#d3f9d8;border-radius:3px;vertical-align:middle;"></span> 정상
+                        <span style="display:inline-block;width:12px;height:12px;background:#fff3bf;border-radius:3px;vertical-align:middle; margin-left:6px;"></span> 지각
+                        <span style="display:inline-block;width:12px;height:12px;background:#d0ebff;border-radius:3px;vertical-align:middle; margin-left:6px;"></span> 사유
+                        <span style="display:inline-block;width:12px;height:12px;background:#ffe3e3;border-radius:3px;vertical-align:middle; margin-left:6px;"></span> 결석
+                    </span>
+                </div>
+                <div class="heatmap-wrap">
+                    ${finalHistory.map(l => {
+                        let cls = 'hmap-absent', label = '✗';
+                        if (l.note === '정상출석' || l.note === '정상') { cls = 'hmap-perfect'; label = '✓'; }
+                        else if (l.note === '지각') { cls = 'hmap-late'; label = '△'; }
+                        else if (l.note !== '결석') { cls = 'hmap-excuse'; label = '○'; }
+                        const shortDate = l.date.slice(5); // MM-DD
+                        return `<div class="hmap-day ${cls}" title="${l.date} ${l.note}">${shortDate}</div>`;
+                    }).join('')}
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-title">📋 상세 기록</div>
+                ${[...finalHistory].reverse().map(log => {
+                    let badge = 'badge-ok';
+                    if (log.note === '지각') badge = 'badge-warn';
+                    else if (log.note === '결석') badge = 'badge-danger';
+                    else if (!['정상출석','정상'].includes(log.note)) badge = 'badge-info';
+                    return `<div class="today-item">
+                        <div style="flex:1; font-size:13px; font-weight:600; color:var(--text);">${log.date}</div>
+                        <div style="font-size:12px; color:var(--muted); margin-right:10px;">${log.time !== '-' ? log.time : ''}</div>
+                        <span class="badge ${badge}">${log.note}</span>
+                    </div>`;
+                }).join('')}
+            </div>`;
     }
 
+    // ===== 유틸 =====
     function closeModal(id) { document.getElementById(id).style.display = "none"; }
-    function openExcuseModal() { 
-        if(!document.getElementById('name-select').value) { alert("이름을 먼저 선택하세요."); return;}
-        document.getElementById('excuseModal').style.display = "block"; 
+    function openExcuseModal() {
+        if (!document.getElementById('name-select').value) { alert("이름을 먼저 선택하세요."); return; }
+        document.getElementById('excuseModal').style.display = "block";
     }
-    window.onclick = function(e) { if(e.target.className === 'modal') e.target.style.display = "none"; }
-    
+    window.onclick = function (e) { if (e.target.classList.contains('modal')) e.target.style.display = "none"; };
+
     function fireConfetti() {
-        var end = Date.now() + 1000;
+        const end = Date.now() + 1000;
         (function frame() {
             confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 } });
             confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 } });
