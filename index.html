@@ -208,6 +208,11 @@
             overflow: hidden;
             animation: slideUp 0.3s cubic-bezier(0.34,1.2,0.64,1);
         }
+        .modal-sheet > #stats-loading-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+        }
         @keyframes slideUp {
             from { transform: translateY(100%); }
             to { transform: translateY(0); }
@@ -947,7 +952,38 @@
         btn.classList.add('active');
     }
 
+    function showStatsLoading(show) {
+        let overlay = document.getElementById('stats-loading-overlay');
+        if (show) {
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'stats-loading-overlay';
+                overlay.style.cssText = `
+                    position: absolute; inset: 0; z-index: 20;
+                    background: rgba(255,255,255,0.93);
+                    display: flex; flex-direction: column;
+                    align-items: center; justify-content: center;
+                    gap: 14px; border-radius: 24px 24px 0 0;
+                `;
+                overlay.innerHTML = `
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="2.5"
+                         style="animation: spin 0.8s linear infinite;">
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+                              stroke-linecap="round"/>
+                    </svg>
+                    <div style="font-size:14px; font-weight:700; color:#3b5bdb;">데이터 불러오는 중...</div>
+                    <div style="font-size:12px; color:#6e7990;">잠시만 기다려 주세요</div>
+                `;
+                document.getElementById('statsModal').appendChild(overlay);
+            }
+            overlay.style.display = 'flex';
+        } else {
+            if (overlay) overlay.style.display = 'none';
+        }
+    }
+
     function loadStatsData() {
+        showStatsLoading(true);
         fetch(GAS_URL + "?action=getStats")
             .then(r => r.json())
             .then(data => {
@@ -960,8 +996,12 @@
                 drawDeptChart(deptStatsCache, 'all');
                 renderDeptMembers(data.todayList || []);
                 renderRank('all');
+                showStatsLoading(false);
             })
-            .catch(err => console.error("loadStatsData 오류:", err));
+            .catch(err => {
+                console.error("loadStatsData 오류:", err);
+                showStatsLoading(false);
+            });
     }
 
     // ===== 오늘 명단 =====
@@ -1144,15 +1184,13 @@
             });
         });
 
-        // 연속 출석 계산 (최근 기준)
+        // 연속 출석 계산 (정상출석 + 전도만 인정)
         Object.values(memberMap).forEach(m => {
             let streak = 0;
             for (let i = allSundays.length - 1; i >= 0; i--) {
-                const logKey = allSundays[i] + '||' + m.name;
                 const matchedLog = allLogsCache.find(l => l.date === allSundays[i] && l.name === m.name);
                 const note = matchedLog ? matchedLog.note : null;
-                const validStreak = note === '정상출석' || note === '전도';
-                if (validStreak) streak++;
+                if (note === '정상출석' || note === '전도') streak++;
                 else break;
             }
             m.streak = streak;
