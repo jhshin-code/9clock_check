@@ -1190,7 +1190,7 @@
             for (let i = allSundays.length - 1; i >= 0; i--) {
                 const matchedLog = allLogsCache.find(l => l.date === allSundays[i] && l.name === m.name);
                 const note = matchedLog ? matchedLog.note : null;
-                if (note === '정상출석' || note === '전도') streak++;
+                if (note === '정상출석' || note === '전도' || note === '명절') streak++;
                 else break;
             }
             m.streak = streak;
